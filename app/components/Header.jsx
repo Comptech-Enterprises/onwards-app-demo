@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useApp } from "@/lib/store";
+import Logo from "./Logo";
 
 export default function Header() {
   const { user, logout } = useApp();
@@ -41,11 +42,8 @@ export default function Header() {
     <header className="header">
       <div className="header-inner container">
         <div className="brand">
-          <div className="brand-mark">OW</div>
-          <div className="brand-text">
-            <strong>Onward Workspaces</strong>
-            <span>{today}</span>
-          </div>
+          <Logo />
+          <span className="brand-date">{today}</span>
         </div>
 
         <div className="header-controls">

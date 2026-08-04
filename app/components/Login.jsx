@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useApp } from "@/lib/store";
+import Logo from "./Logo";
 
 export default function Login() {
   const { login } = useApp();
@@ -21,11 +22,8 @@ export default function Login() {
     <div className="login-screen">
       <form className="login-card" onSubmit={submit}>
         <div className="brand login-brand">
-          <div className="brand-mark">OW</div>
-          <div className="brand-text">
-            <strong>Onward Workspaces</strong>
-            <span>Daily Task Management</span>
-          </div>
+          <Logo className="login-logo" />
+          <span className="brand-date">Daily Task Management</span>
         </div>
 
         <h1 className="login-title">Sign in</h1>

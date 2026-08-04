@@ -5,6 +5,7 @@ export const metadata = {
   title: "Onward Workspaces — Task Management",
   description:
     "Daily task management & issue reporting for Onward Workspaces.",
+  icons: { icon: "/onward-mark.png" },
 };
 
 export const viewport = {
