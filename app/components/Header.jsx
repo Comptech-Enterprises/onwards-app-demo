@@ -8,11 +8,30 @@ export default function Header() {
   const { user, logout } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const today = new Date().toLocaleDateString(undefined, {
-    weekday: "long",
-    day: "numeric",
-    month: "short",
-  });
+  // Rendered on the client only (and ticked every 30s) so the clock stays
+  // current and the server markup doesn't disagree with the first paint.
+  const [now, setNow] = useState(null);
+
+  useEffect(() => {
+    setNow(new Date());
+    const id = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  const today = now
+    ? now.toLocaleDateString(undefined, {
+        weekday: "long",
+        day: "numeric",
+        month: "short",
+      })
+    : "";
+
+  const clock = now
+    ? now.toLocaleTimeString(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : "";
 
   const initials = user.name
     .split(" ")
@@ -43,7 +62,10 @@ export default function Header() {
       <div className="header-inner container">
         <div className="brand">
           <Logo />
-          <span className="brand-date">{today}</span>
+          <span className="brand-date">
+            {today}
+            {clock && <span className="brand-time">{clock}</span>}
+          </span>
         </div>
 
         <div className="header-controls">
@@ -102,7 +124,10 @@ export default function Header() {
 
         <div className="drawer-section">
           <span className="drawer-label">Today</span>
-          <strong>{today}</strong>
+          <strong>
+            {today}
+            {clock && ` · ${clock}`}
+          </strong>
         </div>
 
         <div className="drawer-section">

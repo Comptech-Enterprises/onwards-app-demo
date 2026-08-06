@@ -117,6 +117,24 @@ body {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.15;
+  /* Date and clock sit on one line; the clock is a separate chunk so it can
+     keep its own colour and never wrap mid-time. */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 14px;
+}
+.brand-time {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.brand-time::before {
+  content: "·";
+  margin-right: 10px;
+  color: var(--muted);
+  font-weight: 400;
 }
 .header-controls {
   display: flex;
@@ -201,6 +219,10 @@ main.container {
   box-shadow: var(--shadow);
   padding: 16px;
 }
+/* Full-width now that the completion-bars card is gone. */
+.issues-card {
+  margin-bottom: 14px;
+}
 .card-title {
   font-weight: 700;
   font-size: 14px;
@@ -208,6 +230,24 @@ main.container {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Unit filter that sits on the right of a card title. */
+.unit-filter {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+.unit-filter select {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 10px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 /* Tabs */
@@ -474,82 +514,120 @@ main.container {
   margin-top: 6px;
 }
 
-.dash-grid {
+/* Employee cards — name + unit only, detail lives in the modal. */
+.people-grid {
   display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 14px;
-  margin-bottom: 14px;
-}
-
-.emp-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.emp-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.emp-meta {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-.emp-name {
-  font-weight: 600;
-  font-size: 14px;
-}
-.bar-wrap {
-  display: flex;
-  align-items: center;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 10px;
 }
-.bar {
-  flex: 1;
-  height: 10px;
-  background: var(--surface-2);
+.person-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 14px;
+  border-radius: 12px;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
 }
-.bar-fill {
-  height: 100%;
-  background: var(--brand);
-  border-radius: 999px;
-  transition: width 0.4s ease;
+.person-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--muted);
 }
-.bar-fill.full {
-  background: var(--ok);
+/* Green only once every task for the day is ticked. */
+.person-card.complete {
+  background: var(--ok-soft);
+  border-color: var(--ok);
 }
-.bar-label {
+.person-card.complete .person-name {
+  color: var(--ok);
+}
+.person-name {
+  font-weight: 700;
+  font-size: 14px;
+}
+.person-unit {
   font-size: 12px;
   color: var(--muted);
-  white-space: nowrap;
-  min-width: 78px;
-  text-align: right;
+}
+.person-card.complete .person-unit {
+  color: var(--ok);
+  opacity: 0.8;
 }
 
-/* Detail table */
-.table-scroll {
-  overflow-x: auto;
+/* Employee detail modal */
+.modal-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
 }
-.detail-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(7, 34, 71, 0.55);
 }
-.detail-table th,
-.detail-table td {
-  text-align: left;
-  padding: 10px 10px;
-  border-bottom: 1px solid var(--border);
-  vertical-align: top;
+.modal {
+  position: relative;
+  width: min(520px, 100%);
+  max-height: 82vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px;
 }
-.detail-table th {
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.modal-title {
+  display: block;
+  font-size: 17px;
+}
+.modal-close {
+  background: none;
+  border: none;
   color: var(--muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+}
+.modal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.modal-section {
+  margin-bottom: 14px;
+}
+.modal-section .drawer-label {
+  display: block;
+  margin-bottom: 6px;
+}
+.mini-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.mini-list .mini {
+  margin: 0;
   font-size: 12px;
-  font-weight: 600;
+  padding: 5px 9px;
 }
 .chip {
   display: inline-block;
@@ -576,6 +654,16 @@ main.container {
   background: var(--ok-soft);
   color: var(--ok);
   border-color: transparent;
+}
+/* Time the employee ticked the box, tucked after the task name. */
+.done-time {
+  margin-left: 6px;
+  padding-left: 6px;
+  border-left: 1px solid currentColor;
+  font-style: normal;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
 }
 .pending-mini {
   background: var(--warn-soft);
@@ -834,9 +922,6 @@ main.container {
   .stat-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-  .dash-grid {
-    grid-template-columns: 1fr;
-  }
 }
 @media (max-width: 640px) {
   .header-inner {
@@ -857,38 +942,22 @@ main.container {
   .emp-picker select {
     max-width: 160px;
   }
-  /* Stacked table on mobile */
-  .detail-table thead {
-    display: none;
+  /* Let the unit filter drop onto its own line rather than squeeze the title. */
+  .card-title {
+    flex-wrap: wrap;
   }
-  .detail-table,
-  .detail-table tbody,
-  .detail-table tr,
-  .detail-table td {
-    display: block;
+  .unit-filter {
     width: 100%;
+    margin-left: 0;
   }
-  .detail-table tr {
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    margin-bottom: 10px;
-    padding: 6px;
+  .unit-filter select {
+    flex: 1;
   }
-  .detail-table td {
-    border: 0;
-    padding: 6px 8px;
-    display: flex;
-    gap: 8px;
+  /* Two employee cards per row stays readable down to ~320px. */
+  .people-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
-  .detail-table td::before {
-    content: attr(data-label);
-    font-weight: 700;
-    color: var(--muted);
-    min-width: 82px;
-    flex: 0 0 auto;
-  }
-  .detail-table td[data-label="Done"],
-  .detail-table td[data-label="Pending"] {
-    flex-direction: column;
+  .modal-wrap {
+    padding: 12px;
   }
 }
