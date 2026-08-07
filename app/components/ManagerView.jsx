@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/lib/store";
-import { EMPLOYEES, LOCATIONS, taskById } from "@/lib/seed";
+import { EMPLOYEES, ISSUE_STATUSES, LOCATIONS, taskById } from "@/lib/seed";
 import { IssuePhoto } from "./PhotoLightbox";
+import StatusBadge from "./StatusBadge";
 
 export default function ManagerView() {
   const { completions, issues, view: tab, setView: setTab } = useApp();
@@ -130,8 +131,22 @@ export default function ManagerView() {
 }
 
 // Every issue across the units, filterable and grouped by location.
-function IssuesTab({ issues }) {
+function IssuesTab({ issues: allIssues }) {
   const [unit, setUnit] = useState("all");
+  const [status, setStatus] = useState("all");
+
+  const counts = useMemo(() => {
+    const c = {};
+    ISSUE_STATUSES.forEach((s) => (c[s] = 0));
+    allIssues.forEach((i) => (c[i.status] = (c[i.status] || 0) + 1));
+    return c;
+  }, [allIssues]);
+
+  const issues = useMemo(
+    () =>
+      status === "all" ? allIssues : allIssues.filter((i) => i.status === status),
+    [allIssues, status]
+  );
 
   const units = useMemo(() => {
     const seen = new Set(issues.map((i) => i.location));
@@ -151,7 +166,7 @@ function IssuesTab({ issues }) {
     <div className="card">
       <div className="card-title">
         Reported issues today
-        <span className="pill">{issues.length}</span>
+        <span className="pill">{allIssues.length}</span>
         <label className="unit-filter">
           <span className="muted small">Unit</span>
           <select value={unit} onChange={(e) => setUnit(e.target.value)}>
@@ -165,11 +180,34 @@ function IssuesTab({ issues }) {
         </label>
       </div>
 
+      {/* Status filter — doubles as an at-a-glance count per status. */}
+      <div className="status-filter" role="group" aria-label="Filter by status">
+        <button
+          className={`status-chip ${status === "all" ? "active" : ""}`}
+          onClick={() => setStatus("all")}
+        >
+          All <span className="status-count">{allIssues.length}</span>
+        </button>
+        {ISSUE_STATUSES.map((s) => (
+          <button
+            key={s}
+            className={`status-chip status-${slug(s)} ${
+              status === s ? "active" : ""
+            }`}
+            onClick={() => setStatus(s)}
+          >
+            {s} <span className="status-count">{counts[s]}</span>
+          </button>
+        ))}
+      </div>
+
       {visible.length === 0 ? (
         <p className="muted empty">
-          {issues.length === 0
+          {allIssues.length === 0
             ? "No issues reported yet."
-            : `No issues reported at ${unit}.`}
+            : `No ${status === "all" ? "" : `${status.toLowerCase()} `}issues${
+                unit === "all" ? "" : ` at ${unit}`
+              }.`}
         </p>
       ) : (
         visible.map((loc) => {
@@ -196,11 +234,14 @@ function IssuesTab({ issues }) {
 }
 
 function IssueItem({ issue: i }) {
+  const { setIssueStatus } = useApp();
+
   return (
-    <li className="issue-item">
+    <li className={`issue-item issue-${slug(i.status)}`}>
       <div className="issue-top">
         <span className={`tag tag-${slug(i.category)}`}>{i.category}</span>
         <span className="muted small">{i.location}</span>
+        <StatusBadge status={i.status} />
         <span className="muted small right">
           {new Date(i.createdAt).toLocaleTimeString([], {
             hour: "2-digit",
@@ -215,7 +256,25 @@ function IssueItem({ issue: i }) {
           caption={`${i.category} · ${i.location} — reported by ${i.employeeName}`}
         />
       )}
-      <span className="muted small">reported by {i.employeeName}</span>
+      <div className="issue-foot">
+        <span className="muted small">
+          reported by {i.employeeName}
+          {i.updatedAt && ` · updated ${timeOf(i.updatedAt)}`}
+        </span>
+        <label className="issue-status-set">
+          <span className="muted small">Status</span>
+          <select
+            value={i.status}
+            onChange={(e) => setIssueStatus(i.id, e.target.value)}
+          >
+            {ISSUE_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
     </li>
   );
 }

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import {
+  DEFAULT_STATUS,
   EMPLOYEES,
   OPS_EMAIL,
   authenticate,
@@ -36,7 +37,13 @@ function loadState() {
     // Daily auto-reset: BOTH task completions and issues clear each morning.
     if (parsed.date !== todayKey()) return fresh;
 
-    return { ...fresh, ...parsed };
+    const merged = { ...fresh, ...parsed };
+    // Issues stored before statuses existed default to unattended.
+    merged.issues = (merged.issues || []).map((i) => ({
+      status: DEFAULT_STATUS,
+      ...i,
+    }));
+    return merged;
   } catch {
     return fresh;
   }
@@ -112,11 +119,25 @@ export function AppProvider({ children }) {
       category,
       description,
       photo: photo || null,
+      status: DEFAULT_STATUS,
       createdAt: new Date().toISOString(),
+      updatedAt: null,
       notifiedEmail: OPS_EMAIL,
     };
     setState((prev) => ({ ...prev, issues: [issue, ...prev.issues] }));
     return issue;
+  }
+
+  // Manager moves an issue along: Unattended → In progress → Resolved.
+  function setIssueStatus(issueId, status) {
+    setState((prev) => ({
+      ...prev,
+      issues: prev.issues.map((i) =>
+        i.id === issueId
+          ? { ...i, status, updatedAt: new Date().toISOString() }
+          : i
+      ),
+    }));
   }
 
   const value = {
@@ -130,6 +151,7 @@ export function AppProvider({ children }) {
     issues: state.issues,
     toggleTask,
     addIssue,
+    setIssueStatus,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

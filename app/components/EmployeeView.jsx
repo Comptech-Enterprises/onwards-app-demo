@@ -5,6 +5,7 @@ import { useApp } from "@/lib/store";
 import { employeeById, taskById, CATEGORIES } from "@/lib/seed";
 import IssueForm from "./IssueForm";
 import { IssuePhoto } from "./PhotoLightbox";
+import StatusBadge from "./StatusBadge";
 
 export default function EmployeeView() {
   const { user, completions, issues, toggleTask } = useApp();
@@ -109,12 +110,15 @@ export default function EmployeeView() {
             ) : (
               <ul className="issue-list">
                 {myIssues.map((i) => (
-                  <li key={i.id} className="issue-item">
+                  <li key={i.id} className={`issue-item issue-${slug(i.status)}`}>
                     <div className="issue-top">
                       <span className={`tag tag-${slug(i.category)}`}>
                         {i.category}
                       </span>
-                      <span className="muted small">
+                      <span className="muted small">{i.location}</span>
+                      {/* Read-only here — only the manager moves an issue along. */}
+                      <StatusBadge status={i.status} />
+                      <span className="muted small right">
                         {new Date(i.createdAt).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",

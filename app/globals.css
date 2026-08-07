@@ -422,6 +422,96 @@ main.container {
   font-weight: 600;
 }
 
+/* Issue status */
+.status-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.status-unattended {
+  color: var(--warn);
+  background: var(--warn-soft);
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent);
+}
+.status-in-progress {
+  color: #2f6df4;
+  background: color-mix(in srgb, #2f6df4 15%, transparent);
+  border-color: color-mix(in srgb, #2f6df4 40%, transparent);
+}
+.status-resolved {
+  color: var(--ok);
+  background: var(--ok-soft);
+  border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+}
+
+/* Status filter chips, doubling as counts */
+.status-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.status-chip:hover {
+  color: var(--text);
+}
+.status-chip.active {
+  color: var(--text);
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, var(--surface-2));
+}
+.status-count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+/* Left edge of an issue card reflects its status. */
+.issue-item.issue-in-progress {
+  border-left: 3px solid #2f6df4;
+}
+.issue-item.issue-resolved {
+  border-left: 3px solid var(--ok);
+}
+.issue-item.issue-resolved .issue-desc {
+  opacity: 0.72;
+}
+.issue-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.issue-status-set {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.issue-status-set select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 /* Issues */
 .issue-group + .issue-group {
   margin-top: 18px;
