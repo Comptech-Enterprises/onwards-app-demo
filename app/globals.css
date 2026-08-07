@@ -423,6 +423,18 @@ main.container {
 }
 
 /* Issues */
+.issue-group + .issue-group {
+  margin-top: 18px;
+}
+.issue-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
 .issue-item {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -887,6 +899,32 @@ main.container {
   letter-spacing: 0.6px;
   color: var(--muted);
 }
+.drawer-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.drawer-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 11px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.drawer-nav-item.active {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+.drawer-nav-item .pill {
+  margin-left: auto;
+}
 .drawer-logout {
   margin-top: auto;
   border: 1px solid var(--border);
@@ -933,6 +971,10 @@ main.container {
   }
   .menu-btn {
     display: flex;
+  }
+  /* Manager sections move into the drawer once the hamburger appears. */
+  .manager-tabs {
+    display: none;
   }
   .logo-img {
     height: 26px;

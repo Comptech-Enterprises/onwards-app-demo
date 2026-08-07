@@ -2,10 +2,14 @@
 
 import { useState } from "react";
 import { useApp } from "@/lib/store";
-import { CATEGORIES, OPS_EMAIL } from "@/lib/seed";
+import { CATEGORIES, LOCATIONS, OPS_EMAIL, employeeById } from "@/lib/seed";
 
 export default function IssueForm({ employeeId }) {
   const { addIssue } = useApp();
+  // Defaults to the reporter's own unit, but they can switch it.
+  const [location, setLocation] = useState(
+    () => employeeById(employeeId)?.location || LOCATIONS[0]
+  );
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [description, setDescription] = useState("");
   const [photo, setPhoto] = useState(null);
@@ -22,7 +26,13 @@ export default function IssueForm({ employeeId }) {
   function submit(e) {
     e.preventDefault();
     if (!description.trim()) return;
-    addIssue({ employeeId, category, description: description.trim(), photo });
+    addIssue({
+      employeeId,
+      location,
+      category,
+      description: description.trim(),
+      photo,
+    });
     setDescription("");
     setPhoto(null);
     setFlash(`Reported. Email sent to ${OPS_EMAIL}.`);
@@ -32,6 +42,15 @@ export default function IssueForm({ employeeId }) {
   return (
     <form className="card issue-form" onSubmit={submit}>
       <div className="card-title">Report an issue</div>
+
+      <label className="field">
+        <span>Location</span>
+        <select value={location} onChange={(e) => setLocation(e.target.value)}>
+          {LOCATIONS.map((l) => (
+            <option key={l}>{l}</option>
+          ))}
+        </select>
+      </label>
 
       <label className="field">
         <span>Category</span>

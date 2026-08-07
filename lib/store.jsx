@@ -1,7 +1,13 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { EMPLOYEES, OPS_EMAIL, authenticate, todayKey } from "./seed";
+import {
+  EMPLOYEES,
+  OPS_EMAIL,
+  authenticate,
+  demoIssues,
+  todayKey,
+} from "./seed";
 
 const STORAGE_KEY = "onward-task-state-v1";
 const SESSION_KEY = "onward-session-v1";
@@ -13,8 +19,8 @@ function freshState() {
     date: todayKey(),
     // completions[employeeId][taskId] = ISO timestamp
     completions: {},
-    // issues: newest first
-    issues: [],
+    // issues: newest first — pre-seeded with demo reports across the units
+    issues: demoIssues(),
   };
 }
 
@@ -50,6 +56,9 @@ export function AppProvider({ children }) {
   const [user, setUser] = useState(null); // signed-in user (no password)
   const [state, setState] = useState(freshState);
   const [hydrated, setHydrated] = useState(false);
+  // Which manager section is showing. Lives here so the header drawer can
+  // switch it on mobile, where the tab row is hidden.
+  const [view, setView] = useState("dashboard");
 
   // Re-read from localStorage after mount to avoid SSR mismatch.
   useEffect(() => {
@@ -73,6 +82,7 @@ export function AppProvider({ children }) {
 
   function logout() {
     setUser(null);
+    setView("dashboard");
     window.localStorage.removeItem(SESSION_KEY);
   }
 
@@ -91,13 +101,14 @@ export function AppProvider({ children }) {
     });
   }
 
-  function addIssue({ employeeId, category, description, photo }) {
+  function addIssue({ employeeId, location, category, description, photo }) {
     const emp = EMPLOYEES.find((e) => e.id === employeeId);
     const issue = {
       id: `i-${Date.now()}`,
       employeeId,
       employeeName: emp?.name || "Unknown",
-      location: emp?.location || "Unknown",
+      // Reporter picks the unit — an issue isn't always at their home site.
+      location: location || emp?.location || "Unknown",
       category,
       description,
       photo: photo || null,
@@ -113,6 +124,8 @@ export function AppProvider({ children }) {
     user,
     login,
     logout,
+    view,
+    setView,
     completions: state.completions,
     issues: state.issues,
     toggleTask,

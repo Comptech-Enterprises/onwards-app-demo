@@ -5,7 +5,7 @@ import { useApp } from "@/lib/store";
 import Logo from "./Logo";
 
 export default function Header() {
-  const { user, logout } = useApp();
+  const { user, logout, issues, view, setView } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Rendered on the client only (and ticked every 30s) so the clock stays
@@ -121,6 +121,29 @@ export default function Header() {
             ✕
           </button>
         </div>
+
+        {user.role === "manager" && (
+          <nav className="drawer-nav" aria-label="Sections">
+            <span className="drawer-label">Go to</span>
+            {[
+              { id: "dashboard", label: "Dashboard" },
+              { id: "issues", label: "Issues", count: issues.length },
+            ].map((item) => (
+              <button
+                key={item.id}
+                className={`drawer-nav-item ${view === item.id ? "active" : ""}`}
+                aria-current={view === item.id ? "page" : undefined}
+                onClick={() => {
+                  setView(item.id);
+                  setMenuOpen(false);
+                }}
+              >
+                {item.label}
+                {item.count != null && <span className="pill">{item.count}</span>}
+              </button>
+            ))}
+          </nav>
+        )}
 
         <div className="drawer-section">
           <span className="drawer-label">Today</span>

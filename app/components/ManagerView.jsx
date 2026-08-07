@@ -5,7 +5,7 @@ import { useApp } from "@/lib/store";
 import { EMPLOYEES, LOCATIONS, taskById } from "@/lib/seed";
 
 export default function ManagerView() {
-  const { completions, issues } = useApp();
+  const { completions, issues, view: tab, setView: setTab } = useApp();
   const [unit, setUnit] = useState("all");
   const [openId, setOpenId] = useState(null);
 
@@ -46,6 +46,29 @@ export default function ManagerView() {
         </div>
       </div>
 
+      {/* Hidden on mobile — the hamburger drawer carries the same nav there. */}
+      <div className="tabs manager-tabs" role="tablist">
+        <button
+          role="tab"
+          className={tab === "dashboard" ? "active" : ""}
+          onClick={() => setTab("dashboard")}
+        >
+          Dashboard
+        </button>
+        <button
+          role="tab"
+          className={tab === "issues" ? "active" : ""}
+          onClick={() => setTab("issues")}
+        >
+          Issues
+          <span className="pill">{issues.length}</span>
+        </button>
+      </div>
+
+      {tab === "issues" ? (
+        <IssuesTab issues={issues} />
+      ) : (
+        <>
       {/* Stat tiles */}
       <div className="stat-grid">
         <StatTile label="Overall completion" value={`${totals.pct}%`} accent />
@@ -62,41 +85,6 @@ export default function ManagerView() {
           value={totals.total - totals.completed}
           warn={totals.total - totals.completed > 0}
         />
-      </div>
-
-      {/* Issues panel — inline in the dashboard, not a separate tab */}
-      <div className="card issues-card">
-        <div className="card-title">
-          Reported issues today
-          <span className="pill">{issues.length}</span>
-        </div>
-        {issues.length === 0 ? (
-          <p className="muted empty">No issues reported yet.</p>
-        ) : (
-          <ul className="issue-list">
-            {issues.map((i) => (
-              <li key={i.id} className="issue-item">
-                <div className="issue-top">
-                  <span className={`tag tag-${slug(i.category)}`}>
-                    {i.category}
-                  </span>
-                  <span className="muted small">{i.location}</span>
-                  <span className="muted small right">
-                    {new Date(i.createdAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                </div>
-                <p className="issue-desc">{i.description}</p>
-                {i.photo && (
-                  <img className="issue-photo" src={i.photo} alt="attachment" />
-                )}
-                <span className="muted small">reported by {i.employeeName}</span>
-              </li>
-            ))}
-          </ul>
-        )}
       </div>
 
       {/* All-employee task detail */}
@@ -130,11 +118,99 @@ export default function ManagerView() {
           ))}
         </div>
       </div>
+        </>
+      )}
 
       {openRow && (
         <PersonModal row={openRow} onClose={() => setOpenId(null)} />
       )}
     </section>
+  );
+}
+
+// Every issue across the units, filterable and grouped by location.
+function IssuesTab({ issues }) {
+  const [unit, setUnit] = useState("all");
+
+  const units = useMemo(() => {
+    const seen = new Set(issues.map((i) => i.location));
+    // Keep the configured order, then anything unexpected that turns up.
+    return [
+      ...LOCATIONS.filter((l) => seen.has(l)),
+      ...[...seen].filter((l) => !LOCATIONS.includes(l)),
+    ];
+  }, [issues]);
+
+  const visible = useMemo(
+    () => (unit === "all" ? units : units.filter((l) => l === unit)),
+    [units, unit]
+  );
+
+  return (
+    <div className="card">
+      <div className="card-title">
+        Reported issues today
+        <span className="pill">{issues.length}</span>
+        <label className="unit-filter">
+          <span className="muted small">Unit</span>
+          <select value={unit} onChange={(e) => setUnit(e.target.value)}>
+            <option value="all">All units</option>
+            {LOCATIONS.map((l) => (
+              <option key={l} value={l}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {visible.length === 0 ? (
+        <p className="muted empty">
+          {issues.length === 0
+            ? "No issues reported yet."
+            : `No issues reported at ${unit}.`}
+        </p>
+      ) : (
+        visible.map((loc) => {
+          const forUnit = issues.filter((i) => i.location === loc);
+          return (
+            <div key={loc} className="issue-group">
+              <div className="issue-group-head">
+                <strong>{loc}</strong>
+                <span className="muted small">
+                  {forUnit.length} {forUnit.length === 1 ? "issue" : "issues"}
+                </span>
+              </div>
+              <ul className="issue-list">
+                {forUnit.map((i) => (
+                  <IssueItem key={i.id} issue={i} />
+                ))}
+              </ul>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+function IssueItem({ issue: i }) {
+  return (
+    <li className="issue-item">
+      <div className="issue-top">
+        <span className={`tag tag-${slug(i.category)}`}>{i.category}</span>
+        <span className="muted small">{i.location}</span>
+        <span className="muted small right">
+          {new Date(i.createdAt).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </span>
+      </div>
+      <p className="issue-desc">{i.description}</p>
+      {i.photo && <img className="issue-photo" src={i.photo} alt="attachment" />}
+      <span className="muted small">reported by {i.employeeName}</span>
+    </li>
   );
 }
 
