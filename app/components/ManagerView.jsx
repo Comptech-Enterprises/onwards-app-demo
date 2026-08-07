@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/lib/store";
 import { EMPLOYEES, LOCATIONS, taskById } from "@/lib/seed";
+import { IssuePhoto } from "./PhotoLightbox";
 
 export default function ManagerView() {
   const { completions, issues, view: tab, setView: setTab } = useApp();
@@ -208,7 +209,12 @@ function IssueItem({ issue: i }) {
         </span>
       </div>
       <p className="issue-desc">{i.description}</p>
-      {i.photo && <img className="issue-photo" src={i.photo} alt="attachment" />}
+      {i.photo && (
+        <IssuePhoto
+          src={i.photo}
+          caption={`${i.category} · ${i.location} — reported by ${i.employeeName}`}
+        />
+      )}
       <span className="muted small">reported by {i.employeeName}</span>
     </li>
   );

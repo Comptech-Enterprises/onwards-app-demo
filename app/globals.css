@@ -466,6 +466,89 @@ main.container {
   max-height: 140px;
   width: auto;
 }
+/* Thumbnail acts as a button into the lightbox. */
+.issue-photo-btn {
+  position: relative;
+  display: block;
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 8px;
+  cursor: zoom-in;
+  line-height: 0;
+}
+.issue-photo-btn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+.issue-photo-hint {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(7, 34, 71, 0.72);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.issue-photo-btn:hover .issue-photo-hint,
+.issue-photo-btn:focus-visible .issue-photo-hint {
+  opacity: 1;
+}
+
+/* Full-size photo viewer */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.lightbox .modal-backdrop {
+  background: rgba(4, 18, 38, 0.88);
+}
+.lightbox-figure {
+  position: relative;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  max-width: 100%;
+}
+.lightbox-figure img {
+  max-width: min(900px, 100%);
+  max-height: 78vh;
+  width: auto;
+  border-radius: 10px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}
+.lightbox-figure figcaption {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 13px;
+  text-align: center;
+}
+.lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  z-index: 1;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font-size: 15px;
+  cursor: pointer;
+}
 .tag {
   font-size: 11px;
   font-weight: 700;

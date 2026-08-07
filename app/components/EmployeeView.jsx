@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useApp } from "@/lib/store";
 import { employeeById, taskById, CATEGORIES } from "@/lib/seed";
 import IssueForm from "./IssueForm";
+import { IssuePhoto } from "./PhotoLightbox";
 
 export default function EmployeeView() {
   const { user, completions, issues, toggleTask } = useApp();
@@ -122,7 +123,10 @@ export default function EmployeeView() {
                     </div>
                     <p className="issue-desc">{i.description}</p>
                     {i.photo && (
-                      <img className="issue-photo" src={i.photo} alt="attachment" />
+                      <IssuePhoto
+                        src={i.photo}
+                        caption={`${i.category} · ${i.location}`}
+                      />
                     )}
                     <span className="muted small">
                       ✉ notified {i.notifiedEmail}
