@@ -2,13 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { useApp } from "@/lib/store";
-import { employeeById, taskById, CATEGORIES } from "@/lib/seed";
+import { employeeById, taskById, CATEGORIES, ISSUE_STATUSES } from "@/lib/seed";
 import IssueForm from "./IssueForm";
 import { IssuePhoto } from "./PhotoLightbox";
-import StatusBadge from "./StatusBadge";
 
 export default function EmployeeView() {
-  const { user, completions, issues, toggleTask } = useApp();
+  const { user, completions, issues, toggleTask, setIssueStatus } = useApp();
   const [tab, setTab] = useState("tasks");
 
   const currentEmployeeId = user.id;
@@ -116,8 +115,6 @@ export default function EmployeeView() {
                         {i.category}
                       </span>
                       <span className="muted small">{i.location}</span>
-                      {/* Read-only here — only the manager moves an issue along. */}
-                      <StatusBadge status={i.status} />
                       <span className="muted small right">
                         {new Date(i.createdAt).toLocaleTimeString([], {
                           hour: "2-digit",
@@ -132,9 +129,24 @@ export default function EmployeeView() {
                         caption={`${i.category} · ${i.location}`}
                       />
                     )}
-                    <span className="muted small">
-                      ✉ notified {i.notifiedEmail}
-                    </span>
+                    <div className="issue-foot">
+                      <span className="muted small">
+                        ✉ notified {i.notifiedEmail}
+                      </span>
+                      <label className="issue-status-set">
+                        <span className="muted small">Status</span>
+                        <select
+                          value={i.status}
+                          onChange={(e) => setIssueStatus(i.id, e.target.value)}
+                        >
+                          {ISSUE_STATUSES.map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
                   </li>
                 ))}
               </ul>

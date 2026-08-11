@@ -234,8 +234,6 @@ function IssuesTab({ issues: allIssues }) {
 }
 
 function IssueItem({ issue: i }) {
-  const { setIssueStatus } = useApp();
-
   return (
     <li className={`issue-item issue-${slug(i.status)}`}>
       <div className="issue-top">
@@ -261,19 +259,6 @@ function IssueItem({ issue: i }) {
           reported by {i.employeeName}
           {i.updatedAt && ` · updated ${timeOf(i.updatedAt)}`}
         </span>
-        <label className="issue-status-set">
-          <span className="muted small">Status</span>
-          <select
-            value={i.status}
-            onChange={(e) => setIssueStatus(i.id, e.target.value)}
-          >
-            {ISSUE_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </label>
       </div>
     </li>
   );
