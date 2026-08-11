@@ -96,7 +96,7 @@ export default function ManagerView() {
           <label className="unit-filter">
             <span className="muted small">Unit</span>
             <select value={unit} onChange={(e) => setUnit(e.target.value)}>
-              <option value="all">All units</option>
+              <option value="all">All locations</option>
               {LOCATIONS.map((l) => (
                 <option key={l} value={l}>
                   {l}
@@ -168,9 +168,9 @@ function IssuesTab({ issues: allIssues }) {
         Reported issues today
         <span className="pill">{allIssues.length}</span>
         <label className="unit-filter">
-          <span className="muted small">Unit</span>
+          <span className="muted small">Location</span>
           <select value={unit} onChange={(e) => setUnit(e.target.value)}>
-            <option value="all">All units</option>
+            <option value="all">All locations</option>
             {LOCATIONS.map((l) => (
               <option key={l} value={l}>
                 {l}
@@ -237,8 +237,8 @@ function IssueItem({ issue: i }) {
   return (
     <li className={`issue-item issue-${slug(i.status)}`}>
       <div className="issue-top">
-        <span className={`tag tag-${slug(i.category)}`}>{i.category}</span>
         <span className="muted small">{i.location}</span>
+        <span className={`tag tag-${slug(i.category)}`}>{i.category}</span>
         <StatusBadge status={i.status} />
         <span className="muted small right">
           {new Date(i.createdAt).toLocaleTimeString([], {

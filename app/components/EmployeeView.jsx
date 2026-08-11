@@ -88,10 +88,10 @@ export default function EmployeeView() {
                 {myIssues.map((i) => (
                   <li key={i.id} className={`issue-item issue-${slug(i.status)}`}>
                     <div className="issue-top">
+                      <span className="muted small">{i.location}</span>
                       <span className={`tag tag-${slug(i.category)}`}>
                         {i.category}
                       </span>
-                      <span className="muted small">{i.location}</span>
                       <span className="muted small right">
                         {new Date(i.createdAt).toLocaleTimeString([], {
                           hour: "2-digit",
