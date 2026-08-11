@@ -94,7 +94,7 @@ export default function ManagerView() {
         <div className="card-title">
           All employees — task detail
           <label className="unit-filter">
-            <span className="muted small">Unit</span>
+            <span className="muted small">Location</span>
             <select value={unit} onChange={(e) => setUnit(e.target.value)}>
               <option value="all">All locations</option>
               {LOCATIONS.map((l) => (
