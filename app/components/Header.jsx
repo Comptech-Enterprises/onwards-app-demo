@@ -5,7 +5,7 @@ import { useApp } from "@/lib/store";
 import Logo from "./Logo";
 
 export default function Header() {
-  const { user, logout, issues, view, setView } = useApp();
+  const { user, logout, issues, visitors, view, setView } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Rendered on the client only (and ticked every 30s) so the clock stays
@@ -128,6 +128,7 @@ export default function Header() {
             {[
               { id: "dashboard", label: "Dashboard" },
               { id: "issues", label: "Issues", count: issues.length },
+              { id: "visitors", label: "Visitors", count: visitors.length || null },
             ].map((item) => (
               <button
                 key={item.id}
