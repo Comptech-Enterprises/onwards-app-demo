@@ -4,10 +4,11 @@ import { useMemo, useState } from "react";
 import { useApp } from "@/lib/store";
 import { employeeById, taskById, CATEGORIES, ISSUE_STATUSES } from "@/lib/seed";
 import IssueForm from "./IssueForm";
+import VisitorForm from "./VisitorForm";
 import { IssuePhoto } from "./PhotoLightbox";
 
 export default function EmployeeView() {
-  const { user, completions, issues, toggleTask, setIssueStatus } = useApp();
+  const { user, completions, issues, visitors, toggleTask, setIssueStatus } = useApp();
   const [tab, setTab] = useState("tasks");
 
   const currentEmployeeId = user.id;
@@ -29,6 +30,7 @@ export default function EmployeeView() {
   }, [myTasks]);
 
   const myIssues = issues.filter((i) => i.employeeId === currentEmployeeId);
+  const myVisitors = visitors.filter((v) => v.employeeId === currentEmployeeId);
 
   return (
     <section>
@@ -61,6 +63,14 @@ export default function EmployeeView() {
           Issues
           {myIssues.length > 0 && <span className="pill">{myIssues.length}</span>}
         </button>
+        <button
+          role="tab"
+          className={tab === "visitors" ? "active" : ""}
+          onClick={() => setTab("visitors")}
+        >
+          Visitors
+          {myVisitors.length > 0 && <span className="pill">{myVisitors.length}</span>}
+        </button>
       </div>
 
       {tab === "tasks" ? (
@@ -75,6 +85,36 @@ export default function EmployeeView() {
               toggleTask={toggleTask}
             />
           ))}
+        </div>
+      ) : tab === "visitors" ? (
+        <div className="stack">
+          <VisitorForm employeeId={currentEmployeeId} />
+          <div className="card">
+            <div className="card-title">Visitors logged today</div>
+            {myVisitors.length === 0 ? (
+              <p className="muted empty">No visitors logged yet.</p>
+            ) : (
+              <ul className="issue-list">
+                {myVisitors.map((v) => (
+                  <li key={v.id} className="issue-item">
+                    <div className="issue-top">
+                      <span className="muted small">{v.location}</span>
+                      <span className="muted small right">
+                        {new Date(v.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <p className="issue-desc"><strong>{v.name}</strong>{v.companyName ? ` · ${v.companyName}` : ""}</p>
+                    <div className="issue-foot">
+                      <span className="muted small">
+                        {v.phone && `${v.phone}`}{v.email && ` · ${v.email}`}
+                      </span>
+                      {v.amountPaid && <span className="chip chip-ok">₹{v.amountPaid}</span>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       ) : (
         <div className="stack">

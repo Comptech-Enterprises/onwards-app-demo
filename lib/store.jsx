@@ -22,6 +22,8 @@ function freshState() {
     completions: {},
     // issues: newest first — pre-seeded with demo reports across the units
     issues: demoIssues(),
+    // visitors: walk-ins logged by employees, newest first
+    visitors: [],
   };
 }
 
@@ -108,6 +110,24 @@ export function AppProvider({ children }) {
     });
   }
 
+  function addVisitor({ employeeId, name, phone, email, companyName, amountPaid }) {
+    const emp = EMPLOYEES.find((e) => e.id === employeeId);
+    const visitor = {
+      id: `v-${Date.now()}`,
+      employeeId,
+      employeeName: emp?.name || "Unknown",
+      location: emp?.location || "Unknown",
+      name,
+      phone,
+      email,
+      companyName,
+      amountPaid,
+      createdAt: new Date().toISOString(),
+    };
+    setState((prev) => ({ ...prev, visitors: [visitor, ...prev.visitors] }));
+    return visitor;
+  }
+
   function addIssue({ employeeId, location, category, description, photo }) {
     const emp = EMPLOYEES.find((e) => e.id === employeeId);
     const issue = {
@@ -149,9 +169,11 @@ export function AppProvider({ children }) {
     setView,
     completions: state.completions,
     issues: state.issues,
+    visitors: state.visitors,
     toggleTask,
     addIssue,
     setIssueStatus,
+    addVisitor,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -7,7 +7,7 @@ import { IssuePhoto } from "./PhotoLightbox";
 import StatusBadge from "./StatusBadge";
 
 export default function ManagerView() {
-  const { completions, issues, view: tab, setView: setTab } = useApp();
+  const { completions, issues, visitors, view: tab, setView: setTab } = useApp();
   const [unit, setUnit] = useState("all");
   const [openId, setOpenId] = useState(null);
 
@@ -65,9 +65,19 @@ export default function ManagerView() {
           Issues
           <span className="pill">{issues.length}</span>
         </button>
+        <button
+          role="tab"
+          className={tab === "visitors" ? "active" : ""}
+          onClick={() => setTab("visitors")}
+        >
+          Visitors
+          {visitors.length > 0 && <span className="pill">{visitors.length}</span>}
+        </button>
       </div>
 
-      {tab === "issues" ? (
+      {tab === "visitors" ? (
+        <VisitorsTab visitors={visitors} />
+      ) : tab === "issues" ? (
         <IssuesTab issues={issues} />
       ) : (
         <>
@@ -335,6 +345,73 @@ function PersonModal({ row, onClose }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function VisitorsTab({ visitors: allVisitors }) {
+  const [unit, setUnit] = useState("all");
+
+  const visible = useMemo(
+    () => unit === "all" ? allVisitors : allVisitors.filter((v) => v.location === unit),
+    [allVisitors, unit]
+  );
+
+  const totalPaid = visible.reduce((sum, v) => sum + (parseFloat(v.amountPaid) || 0), 0);
+
+  return (
+    <div className="card">
+      <div className="card-title">
+        Visitors today
+        <span className="pill">{allVisitors.length}</span>
+        <label className="unit-filter">
+          <span className="muted small">Location</span>
+          <select value={unit} onChange={(e) => setUnit(e.target.value)}>
+            <option value="all">All locations</option>
+            {LOCATIONS.map((l) => (
+              <option key={l} value={l}>{l}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="stat-grid" style={{ marginBottom: "12px" }}>
+        <div className="stat-tile accent">
+          <div className="stat-value">{visible.length}</div>
+          <div className="stat-label">Total visitors{unit !== "all" ? ` · ${unit}` : ""}</div>
+        </div>
+        <div className="stat-tile">
+          <div className="stat-value">₹{totalPaid.toLocaleString()}</div>
+          <div className="stat-label">Amount collected</div>
+        </div>
+      </div>
+
+      {visible.length === 0 ? (
+        <p className="muted empty">No visitors logged{unit !== "all" ? ` at ${unit}` : ""} yet.</p>
+      ) : (
+        <ul className="issue-list">
+          {visible.map((v) => (
+            <li key={v.id} className="issue-item">
+              <div className="issue-top">
+                <span className="muted small">{v.location}</span>
+                <span className="muted small right">
+                  {new Date(v.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </div>
+              <p className="issue-desc">
+                <strong>{v.name}</strong>{v.companyName ? ` · ${v.companyName}` : ""}
+              </p>
+              <div className="issue-foot">
+                <span className="muted small">
+                  {[v.phone, v.email].filter(Boolean).join(" · ")}
+                  {" · logged by "}{v.employeeName}
+                </span>
+                {v.amountPaid && <span className="chip chip-ok">₹{v.amountPaid}</span>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
