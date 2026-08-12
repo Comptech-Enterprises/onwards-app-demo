@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useApp } from "@/lib/store";
-import { CATEGORIES, LOCATIONS, OPS_EMAIL, employeeById } from "@/lib/seed";
+import { ISSUE_CATEGORIES, LOCATIONS, OPS_EMAIL, employeeById } from "@/lib/seed";
 
 export default function IssueForm({ employeeId }) {
   const { addIssue } = useApp();
@@ -10,7 +10,7 @@ export default function IssueForm({ employeeId }) {
   const [location, setLocation] = useState(
     () => employeeById(employeeId)?.location || LOCATIONS[0]
   );
-  const [category, setCategory] = useState(CATEGORIES[0]);
+  const [category, setCategory] = useState(ISSUE_CATEGORIES[0]);
   const [description, setDescription] = useState("");
   const [photo, setPhoto] = useState(null);
   const [flash, setFlash] = useState("");
@@ -55,7 +55,7 @@ export default function IssueForm({ employeeId }) {
       <label className="field">
         <span>Category</span>
         <select value={category} onChange={(e) => setCategory(e.target.value)}>
-          {CATEGORIES.map((c) => (
+          {ISSUE_CATEGORIES.map((c) => (
             <option key={c}>{c}</option>
           ))}
         </select>
