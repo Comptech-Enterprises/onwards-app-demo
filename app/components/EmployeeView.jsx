@@ -99,16 +99,15 @@ export default function EmployeeView() {
                   <li key={v.id} className="issue-item">
                     <div className="issue-top">
                       <span className="muted small">{v.location}</span>
-                      <span className="muted small right">
-                        {new Date(v.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      </span>
+                      {v.facilityType && <span className={`tag tag-common-areas`}>{v.facilityType}</span>}
+                      <span className="muted small right">{v.date}</span>
                     </div>
-                    <p className="issue-desc"><strong>{v.name}</strong>{v.companyName ? ` · ${v.companyName}` : ""}</p>
+                    <p className="issue-desc"><strong>{v.guestName}</strong>{v.aggregator ? ` · ${v.aggregator}` : ""}</p>
                     <div className="issue-foot">
                       <span className="muted small">
-                        {v.phone && `${v.phone}`}{v.email && ` · ${v.email}`}
+                        {v.arrivalTime && `In: ${v.arrivalTime}`}{v.punchOutTime && ` · Out: ${v.punchOutTime}`}{v.seats && ` · ${v.seats} seat${v.seats > 1 ? "s" : ""}`}
                       </span>
-                      {v.amountPaid && <span className="chip chip-ok">₹{v.amountPaid}</span>}
+                      {v.payment && <span className="chip chip-ok">₹{v.payment}</span>}
                     </div>
                   </li>
                 ))}

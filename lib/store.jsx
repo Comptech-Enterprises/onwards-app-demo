@@ -110,18 +110,21 @@ export function AppProvider({ children }) {
     });
   }
 
-  function addVisitor({ employeeId, name, phone, email, companyName, amountPaid }) {
+  function addVisitor({ employeeId, date, facilityType, aggregator, arrivalTime, punchOutTime, guestName, location, seats, payment }) {
     const emp = EMPLOYEES.find((e) => e.id === employeeId);
     const visitor = {
       id: `v-${Date.now()}`,
       employeeId,
       employeeName: emp?.name || "Unknown",
-      location: emp?.location || "Unknown",
-      name,
-      phone,
-      email,
-      companyName,
-      amountPaid,
+      location: location || emp?.location || "Unknown",
+      date,
+      facilityType,
+      aggregator,
+      arrivalTime,
+      punchOutTime,
+      guestName,
+      seats,
+      payment,
       createdAt: new Date().toISOString(),
     };
     setState((prev) => ({ ...prev, visitors: [visitor, ...prev.visitors] }));

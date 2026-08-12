@@ -411,6 +411,16 @@ main.container {
 }
 
 /* Forms */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0 12px;
+}
+@media (min-width: 640px) {
+  .form-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
 .field {
   display: flex;
   flex-direction: column;
