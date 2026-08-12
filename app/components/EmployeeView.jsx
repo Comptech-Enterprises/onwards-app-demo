@@ -68,7 +68,7 @@ export default function EmployeeView() {
           className={tab === "visitors" ? "active" : ""}
           onClick={() => setTab("visitors")}
         >
-          Visitors
+          Value Added Services
           {myVisitors.length > 0 && <span className="pill">{myVisitors.length}</span>}
         </button>
       </div>
@@ -90,9 +90,9 @@ export default function EmployeeView() {
         <div className="stack">
           <VisitorForm employeeId={currentEmployeeId} />
           <div className="card">
-            <div className="card-title">Visitors logged today</div>
+            <div className="card-title">Value added services logged today</div>
             {myVisitors.length === 0 ? (
-              <p className="muted empty">No visitors logged yet.</p>
+              <p className="muted empty">No entries logged yet.</p>
             ) : (
               <ul className="issue-list">
                 {myVisitors.map((v) => (

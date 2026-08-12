@@ -21,13 +21,13 @@ export default function VisitorForm({ employeeId }) {
     setEmail("");
     setCompanyName("");
     setAmountPaid("");
-    setFlash("Visitor added.");
+    setFlash("Entry added.");
     setTimeout(() => setFlash(""), 3000);
   }
 
   return (
     <form className="card issue-form" onSubmit={submit}>
-      <div className="card-title">Add visitor</div>
+      <div className="card-title">Add entry</div>
 
       <label className="field">
         <span>Name</span>
@@ -54,7 +54,7 @@ export default function VisitorForm({ employeeId }) {
         <input type="number" placeholder="0" min="0" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} />
       </label>
 
-      <button type="submit" className="btn-primary">Add visitor</button>
+      <button type="submit" className="btn-primary">Add entry</button>
 
       {flash && <div className="flash">{flash}</div>}
     </form>

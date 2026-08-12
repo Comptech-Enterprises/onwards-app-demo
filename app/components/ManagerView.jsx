@@ -70,7 +70,7 @@ export default function ManagerView() {
           className={tab === "visitors" ? "active" : ""}
           onClick={() => setTab("visitors")}
         >
-          Visitors
+          Value Added Services
           {visitors.length > 0 && <span className="pill">{visitors.length}</span>}
         </button>
       </div>
@@ -362,7 +362,7 @@ function VisitorsTab({ visitors: allVisitors }) {
   return (
     <div className="card">
       <div className="card-title">
-        Visitors today
+        Value Added Services today
         <span className="pill">{allVisitors.length}</span>
         <label className="unit-filter">
           <span className="muted small">Location</span>
@@ -378,7 +378,7 @@ function VisitorsTab({ visitors: allVisitors }) {
       <div className="stat-grid" style={{ marginBottom: "12px" }}>
         <div className="stat-tile accent">
           <div className="stat-value">{visible.length}</div>
-          <div className="stat-label">Total visitors{unit !== "all" ? ` · ${unit}` : ""}</div>
+          <div className="stat-label">Total entries{unit !== "all" ? ` · ${unit}` : ""}</div>
         </div>
         <div className="stat-tile">
           <div className="stat-value">₹{totalPaid.toLocaleString()}</div>
@@ -387,7 +387,7 @@ function VisitorsTab({ visitors: allVisitors }) {
       </div>
 
       {visible.length === 0 ? (
-        <p className="muted empty">No visitors logged{unit !== "all" ? ` at ${unit}` : ""} yet.</p>
+        <p className="muted empty">No entries logged{unit !== "all" ? ` at ${unit}` : ""} yet.</p>
       ) : (
         <ul className="issue-list">
           {visible.map((v) => (
