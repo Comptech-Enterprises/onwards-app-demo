@@ -559,6 +559,24 @@ main.container {
   font-size: 12px;
   font-weight: 600;
 }
+.btn-delete {
+  margin-left: auto;
+  border: 1px solid var(--warn);
+  background: transparent;
+  color: var(--warn);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-delete:hover {
+  background: var(--warn-soft);
+}
+.btn-delete:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 
 /* Issues */
 .issue-group + .issue-group {

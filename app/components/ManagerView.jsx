@@ -2,24 +2,25 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/lib/store";
-import { EMPLOYEES, ISSUE_STATUSES, LOCATIONS, taskById } from "@/lib/seed";
+import { ISSUE_STATUSES, LOCATIONS, taskById } from "@/lib/seed";
 import { IssuePhoto } from "./PhotoLightbox";
 import StatusBadge from "./StatusBadge";
+import CmView from "./CmView";
 
 export default function ManagerView() {
-  const { completions, issues, visitors, view: tab, setView: setTab } = useApp();
+  const { completions, issues, visitors, employees, view: tab, setView: setTab } = useApp();
   const [unit, setUnit] = useState("all");
   const [openId, setOpenId] = useState(null);
 
   const rows = useMemo(() => {
-    return EMPLOYEES.map((e) => {
+    return employees.map((e) => {
       const done = completions[e.id] || {};
-      const total = e.taskIds.length;
-      const completed = e.taskIds.filter((id) => done[id]).length;
+      const total = (e.taskIds || []).length;
+      const completed = (e.taskIds || []).filter((id) => done[id]).length;
       const pct = total ? Math.round((completed / total) * 100) : 0;
       return { ...e, total, completed, pct, done };
     });
-  }, [completions]);
+  }, [completions, employees]);
 
   const totals = useMemo(() => {
     const total = rows.reduce((a, r) => a + r.total, 0);
@@ -73,9 +74,19 @@ export default function ManagerView() {
           Value Added Services
           {visitors.length > 0 && <span className="pill">{visitors.length}</span>}
         </button>
+        <button
+          role="tab"
+          className={tab === "cm" ? "active" : ""}
+          onClick={() => setTab("cm")}
+        >
+          CM
+          <span className="pill">{employees.length}</span>
+        </button>
       </div>
 
-      {tab === "visitors" ? (
+      {tab === "cm" ? (
+        <CmView />
+      ) : tab === "visitors" ? (
         <VisitorsTab visitors={visitors} />
       ) : tab === "issues" ? (
         <IssuesTab issues={issues} />
@@ -125,7 +136,7 @@ export default function ManagerView() {
               onClick={() => setOpenId(r.id)}
             >
               <span className="person-name">{r.name}</span>
-              <span className="person-unit">{r.location}{r.phone ? ` · ${r.phone}` : ""}</span>
+              <span className="person-unit">{r.location}{r.employeeCode ? ` · ${r.employeeCode}` : ""}</span>
             </button>
           ))}
         </div>
@@ -244,6 +255,7 @@ function IssuesTab({ issues: allIssues }) {
 }
 
 function IssueItem({ issue: i }) {
+  const { deleteIssue } = useApp();
   return (
     <li className={`issue-item issue-${slug(i.status)}`}>
       <div className="issue-top">
@@ -269,6 +281,15 @@ function IssueItem({ issue: i }) {
           reported by {i.employeeName}
           {i.updatedAt && ` · updated ${timeOf(i.updatedAt)}`}
         </span>
+        <button
+          type="button"
+          className="btn-delete"
+          onClick={() => {
+            if (window.confirm("Delete this issue?")) deleteIssue(i.id);
+          }}
+        >
+          Delete
+        </button>
       </div>
     </li>
   );
@@ -288,8 +309,8 @@ function PersonModal({ row, onClose }) {
     };
   }, [onClose]);
 
-  const doneTasks = row.taskIds.filter((id) => row.done[id]);
-  const pendingTasks = row.taskIds.filter((id) => !row.done[id]);
+  const doneTasks = (row.taskIds || []).filter((id) => row.done[id]);
+  const pendingTasks = (row.taskIds || []).filter((id) => !row.done[id]);
 
   return (
     <div className="modal-wrap" role="dialog" aria-modal="true" aria-label={`${row.name} task detail`}>
@@ -298,7 +319,7 @@ function PersonModal({ row, onClose }) {
         <div className="modal-head">
           <div>
             <strong className="modal-title">{row.name}</strong>
-            <span className="muted small">{row.location}{row.phone ? ` · ${row.phone}` : ""}</span>
+            <span className="muted small">{row.location}{row.employeeCode ? ` · ${row.employeeCode}` : ""}</span>
           </div>
           <button className="modal-close" onClick={onClose} aria-label="Close">
             ✕
@@ -350,6 +371,7 @@ function PersonModal({ row, onClose }) {
 }
 
 function VisitorsTab({ visitors: allVisitors }) {
+  const { deleteVisitor } = useApp();
   const [unit, setUnit] = useState("all");
 
   const visible = useMemo(
@@ -405,6 +427,15 @@ function VisitorsTab({ visitors: allVisitors }) {
                   {v.arrivalTime && `In: ${v.arrivalTime}`}{v.punchOutTime && ` · Out: ${v.punchOutTime}`}{v.seats && ` · ${v.seats} seat${v.seats > 1 ? "s" : ""}`}{" · logged by "}{v.employeeName}
                 </span>
                 {v.payment && <span className="chip chip-ok">₹{v.payment}</span>}
+                <button
+                  type="button"
+                  className="btn-delete"
+                  onClick={() => {
+                    if (window.confirm("Delete this entry?")) deleteVisitor(v.id);
+                  }}
+                >
+                  Delete
+                </button>
               </div>
             </li>
           ))}

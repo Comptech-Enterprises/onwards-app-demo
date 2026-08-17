@@ -129,6 +129,7 @@ export default function Header() {
               { id: "dashboard", label: "Dashboard" },
               { id: "issues", label: "Issues", count: issues.length },
               { id: "visitors", label: "Value Added Services", count: visitors.length || null },
+              { id: "cm", label: "CM" },
             ].map((item) => (
               <button
                 key={item.id}

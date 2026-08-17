@@ -1,17 +1,18 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
+import SEED_USERS from "./credentials.json";
 import {
+  ALL_TASK_IDS,
   DEFAULT_STATUS,
-  EMPLOYEES,
   OPS_EMAIL,
-  authenticate,
   demoIssues,
   todayKey,
 } from "./seed";
 
 const STORAGE_KEY = "onward-task-state-v2";
 const SESSION_KEY = "onward-session-v2";
+const USERS_KEY = "onward-users-v1";
 
 const AppContext = createContext(null);
 
@@ -61,8 +62,31 @@ function loadSession() {
   }
 }
 
+function cloneSeedUsers() {
+  return JSON.parse(JSON.stringify(SEED_USERS));
+}
+
+function loadUsers() {
+  if (typeof window === "undefined") return cloneSeedUsers();
+  try {
+    const raw = window.localStorage.getItem(USERS_KEY);
+    if (!raw) return cloneSeedUsers();
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return cloneSeedUsers();
+    return parsed;
+  } catch {
+    return cloneSeedUsers();
+  }
+}
+
+function withoutPassword(record) {
+  const { password: _pw, ...safe } = record;
+  return safe;
+}
+
 export function AppProvider({ children }) {
   const [user, setUser] = useState(null); // signed-in user (no password)
+  const [users, setUsers] = useState(cloneSeedUsers);
   const [state, setState] = useState(freshState);
   const [hydrated, setHydrated] = useState(false);
   // Which manager section is showing. Lives here so the header drawer can
@@ -72,6 +96,7 @@ export function AppProvider({ children }) {
   // Re-read from localStorage after mount to avoid SSR mismatch.
   useEffect(() => {
     setState(loadState());
+    setUsers(loadUsers());
     setUser(loadSession());
     setHydrated(true);
   }, []);
@@ -81,11 +106,20 @@ export function AppProvider({ children }) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state, hydrated]);
 
+  useEffect(() => {
+    if (!hydrated) return;
+    window.localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  }, [users, hydrated]);
+
   function login(username, password) {
-    const found = authenticate(username, password);
+    const u = username.trim().toLowerCase();
+    const found = users.find(
+      (x) => x.username.toLowerCase() === u && x.password === password
+    );
     if (!found) return false;
-    setUser(found);
-    window.localStorage.setItem(SESSION_KEY, JSON.stringify(found));
+    const safe = withoutPassword(found);
+    setUser(safe);
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify(safe));
     return true;
   }
 
@@ -110,8 +144,52 @@ export function AppProvider({ children }) {
     });
   }
 
+  function addUser({ name, username, password, location, employeeCode }) {
+    const uname = username.trim().toLowerCase();
+    const code = (employeeCode || "").trim();
+    if (!name.trim() || !uname || !password || !code) {
+      return { ok: false, error: "Name, employee code, username and password are required." };
+    }
+    if (users.some((u) => u.username.toLowerCase() === uname)) {
+      return { ok: false, error: "Username already exists." };
+    }
+    if (
+      users.some(
+        (u) => (u.employeeCode || "").trim().toLowerCase() === code.toLowerCase()
+      )
+    ) {
+      return { ok: false, error: "Employee code already exists." };
+    }
+    const record = {
+      id: `e-${Date.now()}`,
+      name: name.trim(),
+      username: uname,
+      password,
+      role: "employee",
+      location,
+      employeeCode: code,
+      taskIds: [...ALL_TASK_IDS],
+    };
+    setUsers((prev) => [...prev, record]);
+    return { ok: true };
+  }
+
+  function deleteUser(userId) {
+    if (user?.id === userId) {
+      return { ok: false, error: "You cannot delete the signed-in account." };
+    }
+    const target = users.find((u) => u.id === userId);
+    if (!target) return { ok: false, error: "User not found." };
+    const managerCount = users.filter((u) => u.role === "manager").length;
+    if (target.role === "manager" && managerCount <= 1) {
+      return { ok: false, error: "Keep at least one manager." };
+    }
+    setUsers((prev) => prev.filter((u) => u.id !== userId));
+    return { ok: true };
+  }
+
   function addVisitor({ employeeId, date, facilityType, aggregator, arrivalTime, punchOutTime, guestName, location, seats, payment }) {
-    const emp = EMPLOYEES.find((e) => e.id === employeeId);
+    const emp = users.find((e) => e.id === employeeId);
     const visitor = {
       id: `v-${Date.now()}`,
       employeeId,
@@ -132,7 +210,7 @@ export function AppProvider({ children }) {
   }
 
   function addIssue({ employeeId, location, category, description, photo }) {
-    const emp = EMPLOYEES.find((e) => e.id === employeeId);
+    const emp = users.find((e) => e.id === employeeId);
     const issue = {
       id: `i-${Date.now()}`,
       employeeId,
@@ -163,6 +241,20 @@ export function AppProvider({ children }) {
     }));
   }
 
+  function deleteIssue(issueId) {
+    setState((prev) => ({
+      ...prev,
+      issues: prev.issues.filter((i) => i.id !== issueId),
+    }));
+  }
+
+  function deleteVisitor(visitorId) {
+    setState((prev) => ({
+      ...prev,
+      visitors: prev.visitors.filter((v) => v.id !== visitorId),
+    }));
+  }
+
   const value = {
     hydrated,
     user,
@@ -170,13 +262,19 @@ export function AppProvider({ children }) {
     logout,
     view,
     setView,
+    users,
+    employees: users.filter((u) => u.role === "employee"),
     completions: state.completions,
     issues: state.issues,
     visitors: state.visitors,
     toggleTask,
     addIssue,
     setIssueStatus,
+    deleteIssue,
     addVisitor,
+    deleteVisitor,
+    addUser,
+    deleteUser,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
