@@ -71,10 +71,6 @@ export default function Login() {
         <button type="submit" className="btn-primary">
           Sign in
         </button>
-
-        <a className="creds-link" href="/credentials.xlsx" download>
-          ⬇ Download credentials sheet (Excel)
-        </a>
       </form>
     </div>
   );

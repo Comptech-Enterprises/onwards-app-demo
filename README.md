@@ -19,7 +19,6 @@ Built by **Comptech Enterprises**.
   - All-employees table showing each person's done vs. pending tasks (collapses to cards on mobile).
 - **Daily auto-reset** — both task completions and issues clear on a new calendar day.
 - **localStorage persistence** — all state is stored client-side; no backend required.
-- **Credentials Excel** — a generated `.xlsx` of all logins, downloadable from the login screen.
 - Fully responsive, light/dark aware.
 
 ---
@@ -40,23 +39,27 @@ Open http://localhost:3000.
 | `npm run dev` | Start the dev server |
 | `npm run build` | Production build |
 | `npm run start` | Serve the production build |
-| `npm run gen:creds` | Regenerate `public/credentials.xlsx` from `lib/credentials.json` |
 
 ---
 
 ## Login credentials
 
-| Role | Username | Password |
-|------|----------|----------|
-| **Manager** | `manager` | `Manager@123` |
-| Amit Sharma | `amit` | `Amit@123` |
-| Priya Nair | `priya` | `Priya@123` |
-| Rahul Verma | `rahul` | `Rahul@123` |
-| Sara Khan | `sara` | `Sara@123` |
-| John Dsouza | `john` | `John@123` |
-| Meera Iyer | `meera` | `Meera@123` |
+| Role | Name | Username | Password | Centre |
+|------|------|----------|----------|--------|
+| **Manager** | Ops Manager | `manager` | `Manager@123` | All centres |
+| Employee | Anubhav | `anubhav` | `Anubhav@123` | Okhla Phase 2 |
+| Employee | Arpit Tanwar | `arpit` | `Arpit@123` | Okhla Phase 3 |
+| Employee | Amit | `amit` | `Amit@123` | Okhla Phase 3 |
+| Employee | Mukund | `mukund` | `Mukund@123` | Okhla Phase 3 |
+| Employee | Kamal Khanna | `kamal` | `Kamal@123` | Noida Sector 126 |
+| Employee | Abhishek Dalal | `abhishek` | `Abhishek@123` | Udyog Vihar Phase 4 |
+| Employee | Sourabh | `sourabh` | `Sourabh@123` | Udyog Vihar Phase 4 |
+| Employee | Sameer | `sameer` | `Sameer@123` | Emaar Capital |
+| Employee | Harish | `harish` | `Harish@123` | 151, Okhla Phase 3 |
+| Employee | Akansha | `akansha` | `Akansha@123` | ECE House, Connaught Place |
+| Employee | Sameer | `sameer.ece` | `Sameer@123` | ECE House, Connaught Place |
 
-The full list is also downloadable as an Excel sheet from the login screen.
+Mohan Cooperative is in the centre list with no staff login yet.
 
 ---
 
@@ -68,24 +71,20 @@ app/
   page.js                # login gating + role-based routing
   globals.css            # responsive design system (light/dark)
   components/
-    Login.jsx            # login screen + credentials download
+    Login.jsx            # login screen
     Header.jsx           # signed-in user + logout
     EmployeeView.jsx     # Tasks / Issues tabs
     IssueForm.jsx        # report issue with optional photo
     ManagerView.jsx      # dashboard: stats, per-employee bars, issues
 lib/
   credentials.json       # single source of truth for users/logins
-  seed.js                # locations, tasks, assignments, auth helper
+  seed.js                # centres, tasks, assignments, auth helper
   store.jsx              # React context + localStorage + daily reset
-scripts/
-  gen-credentials.mjs    # builds public/credentials.xlsx
-public/
-  credentials.xlsx       # generated credentials sheet
 ```
 
 ## Configuration
 
-Edit `lib/credentials.json` to change users, passwords, locations, and per-employee task assignments, then run `npm run gen:creds` to refresh the Excel sheet. Task catalogue and categories live in `lib/seed.js`.
+Edit `lib/credentials.json` to change users, passwords, centres, and per-employee task assignments. Task catalogue and categories live in `lib/seed.js`. Centres live in `LOCATIONS` in `lib/seed.js`.
 
 ---
 
