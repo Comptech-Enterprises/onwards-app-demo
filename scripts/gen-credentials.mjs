@@ -1,4 +1,4 @@
-// Generates public/credentials.xlsx from lib/credentials.json.
+// Optional local export of logins. Writes outside /public so it is not served.
 // Run with: npm run gen:creds
 import fs from "node:fs";
 import path from "node:path";
@@ -15,11 +15,12 @@ const rows = users.map((u) => ({
   Role: u.role === "manager" ? "Manager" : "Employee",
   Username: u.username,
   Password: u.password,
-  Location: u.location || "All locations",
+  Centre: u.location || "All centres",
+  Phone: u.phone || "",
 }));
 
 const ws = XLSX.utils.json_to_sheet(rows, {
-  header: ["Name", "Role", "Username", "Password", "Location"],
+  header: ["Name", "Role", "Username", "Password", "Centre", "Phone"],
 });
 
 // Column widths for readability.
@@ -28,15 +29,14 @@ ws["!cols"] = [
   { wch: 10 },
   { wch: 14 },
   { wch: 16 },
-  { wch: 16 },
+  { wch: 28 },
+  { wch: 14 },
 ];
 
 const wb = XLSX.utils.book_new();
 XLSX.utils.book_append_sheet(wb, ws, "Credentials");
 
-const outDir = path.join(root, "public");
-fs.mkdirSync(outDir, { recursive: true });
-const outFile = path.join(outDir, "credentials.xlsx");
+const outFile = path.join(root, "credentials.xlsx");
 XLSX.writeFile(wb, outFile);
 
 console.log(`Wrote ${rows.length} credentials to ${outFile}`);

@@ -29,7 +29,7 @@ export default function ManagerView() {
     return { total, completed, pct, fullyDone };
   }, [rows]);
 
-  const locations = new Set(EMPLOYEES.map((e) => e.location)).size;
+  const centreCount = LOCATIONS.length;
 
   // The task-detail table can be narrowed to a single unit.
   const detailRows = useMemo(
@@ -44,7 +44,7 @@ export default function ManagerView() {
       <div className="page-head">
         <div>
           <h1>Manager Dashboard</h1>
-          <p className="muted">Live view across all {locations} units</p>
+          <p className="muted">Live view across all {centreCount} centres</p>
         </div>
       </div>
 
@@ -104,9 +104,9 @@ export default function ManagerView() {
         <div className="card-title">
           All employees — task detail
           <label className="unit-filter">
-            <span className="muted small">Location</span>
+            <span className="muted small">Centre</span>
             <select value={unit} onChange={(e) => setUnit(e.target.value)}>
-              <option value="all">All locations</option>
+              <option value="all">All centres</option>
               {LOCATIONS.map((l) => (
                 <option key={l} value={l}>
                   {l}
@@ -125,7 +125,7 @@ export default function ManagerView() {
               onClick={() => setOpenId(r.id)}
             >
               <span className="person-name">{r.name}</span>
-              <span className="person-unit">{r.location}</span>
+              <span className="person-unit">{r.location}{r.phone ? ` · ${r.phone}` : ""}</span>
             </button>
           ))}
         </div>
@@ -178,9 +178,9 @@ function IssuesTab({ issues: allIssues }) {
         Reported issues today
         <span className="pill">{allIssues.length}</span>
         <label className="unit-filter">
-          <span className="muted small">Location</span>
+          <span className="muted small">Centre</span>
           <select value={unit} onChange={(e) => setUnit(e.target.value)}>
-            <option value="all">All locations</option>
+            <option value="all">All centres</option>
             {LOCATIONS.map((l) => (
               <option key={l} value={l}>
                 {l}
@@ -298,7 +298,7 @@ function PersonModal({ row, onClose }) {
         <div className="modal-head">
           <div>
             <strong className="modal-title">{row.name}</strong>
-            <span className="muted small">{row.location}</span>
+            <span className="muted small">{row.location}{row.phone ? ` · ${row.phone}` : ""}</span>
           </div>
           <button className="modal-close" onClick={onClose} aria-label="Close">
             ✕
@@ -365,9 +365,9 @@ function VisitorsTab({ visitors: allVisitors }) {
         Value Added Services today
         <span className="pill">{allVisitors.length}</span>
         <label className="unit-filter">
-          <span className="muted small">Location</span>
+          <span className="muted small">Centre</span>
           <select value={unit} onChange={(e) => setUnit(e.target.value)}>
-            <option value="all">All locations</option>
+            <option value="all">All centres</option>
             {LOCATIONS.map((l) => (
               <option key={l} value={l}>{l}</option>
             ))}

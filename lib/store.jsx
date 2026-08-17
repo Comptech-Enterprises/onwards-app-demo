@@ -10,8 +10,8 @@ import {
   todayKey,
 } from "./seed";
 
-const STORAGE_KEY = "onward-task-state-v1";
-const SESSION_KEY = "onward-session-v1";
+const STORAGE_KEY = "onward-task-state-v2";
+const SESSION_KEY = "onward-session-v2";
 
 const AppContext = createContext(null);
 

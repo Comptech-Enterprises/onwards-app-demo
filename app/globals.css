@@ -975,17 +975,14 @@ main.container {
   font-weight: 600;
   margin-bottom: 12px;
 }
-.creds-link {
-  display: block;
-  text-align: center;
-  margin-top: 16px;
+.login-error {
+  background: var(--warn-soft);
+  color: var(--warn);
+  border-radius: 10px;
+  padding: 9px 12px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--brand);
-  text-decoration: none;
-}
-.creds-link:hover {
-  text-decoration: underline;
+  margin-bottom: 12px;
 }
 
 /* User chip in header */

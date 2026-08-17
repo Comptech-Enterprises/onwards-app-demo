@@ -44,7 +44,7 @@ export default function IssueForm({ employeeId }) {
       <div className="card-title">Report an issue</div>
 
       <label className="field">
-        <span>Location</span>
+        <span>Centre</span>
         <select value={location} onChange={(e) => setLocation(e.target.value)}>
           {LOCATIONS.map((l) => (
             <option key={l}>{l}</option>
