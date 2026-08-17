@@ -2,20 +2,20 @@
 
 import { useMemo, useState } from "react";
 import { useApp } from "@/lib/store";
-import { employeeById, taskById, CATEGORIES, ISSUE_STATUSES } from "@/lib/seed";
+import { taskById, CATEGORIES, ISSUE_STATUSES } from "@/lib/seed";
 import IssueForm from "./IssueForm";
 import VisitorForm from "./VisitorForm";
 import { IssuePhoto } from "./PhotoLightbox";
 
 export default function EmployeeView() {
-  const { user, completions, issues, visitors, toggleTask, setIssueStatus } = useApp();
+  const { user, users, completions, issues, visitors, toggleTask, setIssueStatus, deleteIssue, deleteVisitor } = useApp();
   const [tab, setTab] = useState("tasks");
 
   const currentEmployeeId = user.id;
-  const employee = employeeById(currentEmployeeId) || user;
+  const employee = users.find((u) => u.id === currentEmployeeId) || user;
   const done = completions[currentEmployeeId] || {};
 
-  const myTasks = employee.taskIds.map(taskById);
+  const myTasks = (employee.taskIds || []).map(taskById).filter(Boolean);
   const completedCount = myTasks.filter((t) => done[t.id]).length;
   const pct = myTasks.length
     ? Math.round((completedCount / myTasks.length) * 100)
@@ -108,6 +108,15 @@ export default function EmployeeView() {
                         {v.arrivalTime && `In: ${v.arrivalTime}`}{v.punchOutTime && ` · Out: ${v.punchOutTime}`}{v.seats && ` · ${v.seats} seat${v.seats > 1 ? "s" : ""}`}
                       </span>
                       {v.payment && <span className="chip chip-ok">₹{v.payment}</span>}
+                      <button
+                        type="button"
+                        className="btn-delete"
+                        onClick={() => {
+                          if (window.confirm("Delete this entry?")) deleteVisitor(v.id);
+                        }}
+                      >
+                        Delete
+                      </button>
                     </div>
                   </li>
                 ))}
@@ -162,6 +171,15 @@ export default function EmployeeView() {
                           ))}
                         </select>
                       </label>
+                      <button
+                        type="button"
+                        className="btn-delete"
+                        onClick={() => {
+                          if (window.confirm("Delete this issue?")) deleteIssue(i.id);
+                        }}
+                      >
+                        Delete
+                      </button>
                     </div>
                   </li>
                 ))}

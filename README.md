@@ -8,7 +8,7 @@ Built by **Comptech Enterprises**.
 
 ## Features
 
-- **Role-based login** — one manager account + individual employee accounts (hardcoded credentials for this prototype).
+- **Role-based login** — manager accounts + individual employee accounts (hardcoded credentials for this prototype).
 - **Employee view**
   - **Tasks tab** — only your own tasks for the day, grouped by category, tap to complete (records the time), with a live completion ring.
   - **Issues tab** — report an issue with category, description, and an optional photo; simulates an email to central operations, then lists your reported issues.
@@ -47,6 +47,8 @@ Open http://localhost:3000.
 | Role | Name | Username | Password | Centre |
 |------|------|----------|----------|--------|
 | **Manager** | Ops Manager | `manager` | `Manager@123` | All centres |
+| **Manager** | Mannat Jain | `mannat` | `Mannat@123` | All centres |
+| **Manager** | Anil Purdhani | `anil` | `Anil@123` | All centres |
 | Employee | Anubhav | `anubhav` | `Anubhav@123` | Okhla Phase 2 |
 | Employee | Arpit Tanwar | `arpit` | `Arpit@123` | Okhla Phase 3 |
 | Employee | Amit | `amit` | `Amit@123` | Okhla Phase 3 |

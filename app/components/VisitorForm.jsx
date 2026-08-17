@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useApp } from "@/lib/store";
-import { LOCATIONS, employeeById } from "@/lib/seed";
+import { LOCATIONS } from "@/lib/seed";
 
 const FACILITY_TYPES = ["Meeting Room", "Day Pass", "Virtual Office", "Shooting"];
 const AGGREGATORS = ["myHQ", "Qdesq", "SimplyWork", "Cofynd", "SpaceN", "Stylework", "EasyDesq", "InstantOffice", "Lease Circle", "Direct / Other"];
@@ -12,8 +12,8 @@ function today() {
 }
 
 export default function VisitorForm({ employeeId }) {
-  const { addVisitor } = useApp();
-  const emp = employeeById(employeeId);
+  const { addVisitor, users } = useApp();
+  const emp = users.find((u) => u.id === employeeId);
 
   const [date, setDate] = useState(today());
   const [facilityType, setFacilityType] = useState(FACILITY_TYPES[0]);
@@ -92,7 +92,7 @@ export default function VisitorForm({ employeeId }) {
           <input type="number" placeholder="e.g. 6" min="1" value={seats} onChange={(e) => setSeats(e.target.value)} required />
         </label>
         <label className="field">
-          <span>Payment (₹) — optional</span>
+          <span>Payment (₹) — excluding GST</span>
           <input type="number" placeholder="e.g. 560" min="0" value={payment} onChange={(e) => setPayment(e.target.value)} />
         </label>
       </div>

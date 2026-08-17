@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import { useApp } from "@/lib/store";
-import { ISSUE_CATEGORIES, LOCATIONS, OPS_EMAIL, employeeById } from "@/lib/seed";
+import { ISSUE_CATEGORIES, LOCATIONS, OPS_EMAIL } from "@/lib/seed";
 
 export default function IssueForm({ employeeId }) {
-  const { addIssue } = useApp();
+  const { addIssue, users } = useApp();
   // Defaults to the reporter's own unit, but they can switch it.
   const [location, setLocation] = useState(
-    () => employeeById(employeeId)?.location || LOCATIONS[0]
+    () => users.find((u) => u.id === employeeId)?.location || LOCATIONS[0]
   );
   const [category, setCategory] = useState(ISSUE_CATEGORIES[0]);
   const [description, setDescription] = useState("");
