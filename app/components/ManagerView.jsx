@@ -2,25 +2,60 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/lib/store";
-import { ISSUE_STATUSES, LOCATIONS, canDeleteIssue, canDeleteVisitor, taskById } from "@/lib/seed";
+import {
+  CATEGORY_REVIEWERS,
+  ISSUE_STATUSES,
+  LOCATIONS,
+  REVIEW_CATEGORIES,
+  canDeleteIssue,
+  canDeleteVisitor,
+  isDedicatedReviewer,
+  liveDoneMap,
+  reviewProgress,
+  taskById,
+  tasksForCategory,
+  visibleTasks,
+} from "@/lib/seed";
 import { IssuePhoto } from "./PhotoLightbox";
 import StatusBadge from "./StatusBadge";
 import CmView from "./CmView";
 
 export default function ManagerView() {
-  const { completions, issues, visitors, employees, view: tab, setView: setTab } = useApp();
+  const { completions, reviewChecks, checklistPhotos, issues, visitors, employees, view: tab, setView: setTab } = useApp();
   const [unit, setUnit] = useState("all");
   const [openId, setOpenId] = useState(null);
 
   const rows = useMemo(() => {
     return employees.map((e) => {
-      const done = completions[e.id] || {};
-      const total = (e.taskIds || []).length;
-      const completed = (e.taskIds || []).filter((id) => done[id]).length;
+      const done = liveDoneMap(completions[e.id] || {});
+      let total;
+      let completed;
+      if (isDedicatedReviewer(e)) {
+        const cats = REVIEW_CATEGORIES.filter((c) => CATEGORY_REVIEWERS[c] && (
+          (e.username || "").toLowerCase() === CATEGORY_REVIEWERS[c].username.toLowerCase()
+          || (e.name || "").toLowerCase() === CATEGORY_REVIEWERS[c].name.toLowerCase()
+        ));
+        total = 0;
+        completed = 0;
+        for (const loc of LOCATIONS) {
+          for (const cat of cats) {
+            const p = reviewProgress(reviewChecks, cat, loc);
+            total += p.total;
+            completed += p.completed;
+          }
+        }
+      } else {
+        const due = visibleTasks(
+          (e.taskIds || []).map(taskById).filter(Boolean),
+          done
+        );
+        total = due.length;
+        completed = due.filter((t) => done[t.id]).length;
+      }
       const pct = total ? Math.round((completed / total) * 100) : 0;
-      return { ...e, total, completed, pct, done };
+      return { ...e, total, completed, pct, done, photos: checklistPhotos[e.id] || {}, reviewChecks };
     });
-  }, [completions, employees]);
+  }, [completions, reviewChecks, checklistPhotos, employees]);
 
   const totals = useMemo(() => {
     const total = rows.reduce((a, r) => a + r.total, 0);
@@ -34,7 +69,10 @@ export default function ManagerView() {
 
   // The task-detail table can be narrowed to a single unit.
   const detailRows = useMemo(
-    () => (unit === "all" ? rows : rows.filter((r) => r.location === unit)),
+    () =>
+      unit === "all"
+        ? rows
+        : rows.filter((r) => r.location === unit || isDedicatedReviewer(r)),
     [rows, unit]
   );
 
@@ -269,7 +307,7 @@ function IssueItem({ issue: i }) {
           })}
         </span>
       </div>
-      <p className="issue-desc">{i.description}</p>
+      <p className="issue-desc">{i.notes || i.description}</p>
       {i.photo && (
         <IssuePhoto
           src={i.photo}
@@ -313,8 +351,11 @@ function PersonModal({ row, onClose }) {
     };
   }, [onClose]);
 
-  const doneTasks = (row.taskIds || []).filter((id) => row.done[id]);
-  const pendingTasks = (row.taskIds || []).filter((id) => !row.done[id]);
+  const visible = visibleTasks((row.taskIds || []).map(taskById).filter(Boolean), row.done);
+  const doneTasks = visible.filter((t) => row.done[t.id]).map((t) => t.id);
+  const pendingTasks = visible.filter((t) => !row.done[t.id]).map((t) => t.id);
+  const reviewer = isDedicatedReviewer(row);
+  const siteLocation = row.location !== "All centres" ? row.location : null;
 
   return (
     <div className="modal-wrap" role="dialog" aria-modal="true" aria-label={`${row.name} task detail`}>
@@ -338,18 +379,58 @@ function PersonModal({ row, onClose }) {
             </span>
           </div>
 
+          {reviewer ? (
+            REVIEW_CATEGORIES.map((category) => (
+              <div key={category} className="modal-section">
+                <span className="drawer-label">{category} · reviewed by {row.name}</span>
+                {LOCATIONS.map((loc) => {
+                  const p = reviewProgress(row.reviewChecks, category, loc);
+                  const pending = tasksForCategory(category).filter((t) => !p.done[t.id]);
+                  return (
+                    <div key={loc} className="review-centre-block">
+                      <div className="modal-row">
+                        <span>{loc}</span>
+                        <span className={`chip ${p.completed === p.total ? "chip-ok" : ""}`}>
+                          {p.completed}/{p.total}
+                        </span>
+                      </div>
+                      {pending.length > 0 && (
+                        <div className="mini-list">
+                          {pending.map((t) => (
+                            <span key={t.id} className="mini pending-mini">
+                              {t.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))
+          ) : (
+            <>
+          <PhotoReview label="Washroom photos" photos={row.photos?.Washroom} captionPrefix={`${row.location} · washroom`} />
+          <PhotoReview label="Pantry photos" photos={row.photos?.Pantry} captionPrefix={`${row.location} · pantry`} />
+          <PhotoReview label="Common area photos" photos={row.photos?.["Common Areas"]} captionPrefix={`${row.location} · common area`} />
+          <PhotoReview label="Soft services staff photo" photos={row.photos?.["Soft Services"]} captionPrefix={`${row.location} · soft services staff`} />
+
           <div className="modal-section">
             <span className="drawer-label">Done</span>
             {doneTasks.length === 0 ? (
               <p className="muted empty">Nothing ticked off yet.</p>
             ) : (
               <div className="mini-list">
-                {doneTasks.map((id) => (
+                {doneTasks.map((id) => {
+                  const task = taskById(id);
+                  if (!task) return null;
+                  return (
                   <span key={id} className="mini done-mini">
-                    {taskById(id).name}
+                    {task.name}
                     <em className="done-time">{timeOf(row.done[id])}</em>
                   </span>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -360,14 +441,51 @@ function PersonModal({ row, onClose }) {
               <p className="muted empty">All tasks complete.</p>
             ) : (
               <div className="mini-list">
-                {pendingTasks.map((id) => (
+                {pendingTasks.map((id) => {
+                  const task = taskById(id);
+                  if (!task) return null;
+                  return (
                   <span key={id} className="mini pending-mini">
-                    {taskById(id).name}
+                    {task.name}
                   </span>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
+
+          {siteLocation && REVIEW_CATEGORIES.map((category) => {
+            const owner = CATEGORY_REVIEWERS[category];
+            const p = reviewProgress(row.reviewChecks, category, siteLocation);
+            const pending = tasksForCategory(category).filter((t) => !p.done[t.id]);
+            return (
+              <div key={category} className="modal-section">
+                <span className="drawer-label">{category}</span>
+                <p className="muted small review-note">
+                  {p.completed === p.total
+                    ? `Checked by ${owner.name}`
+                    : `Pending — this checklist is reviewed by ${owner.name}`}
+                </p>
+                <div className="modal-row">
+                  <span className="muted small">{siteLocation}</span>
+                  <span className={`chip ${p.completed === p.total ? "chip-ok" : ""}`}>
+                    {p.completed}/{p.total}
+                  </span>
+                </div>
+                {pending.length > 0 && (
+                  <div className="mini-list">
+                    {pending.map((t) => (
+                      <span key={t.id} className="mini pending-mini">
+                        {t.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -448,6 +566,24 @@ function VisitorsTab({ visitors: allVisitors }) {
             </li>
           ))}
         </ul>
+      )}
+    </div>
+  );
+}
+
+function PhotoReview({ label, photos, captionPrefix }) {
+  const list = photos || [];
+  return (
+    <div className="modal-section">
+      <span className="drawer-label">{label}</span>
+      {list.length === 0 ? (
+        <p className="muted empty">No photos uploaded.</p>
+      ) : (
+        <div className="pantry-photo-grid">
+          {list.map((src, i) => (
+            <IssuePhoto key={`${captionPrefix}-${i}`} src={src} caption={`${captionPrefix} ${i + 1}`} />
+          ))}
+        </div>
       )}
     </div>
   );
