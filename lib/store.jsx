@@ -7,6 +7,7 @@ import {
   DEFAULT_STATUS,
   OPS_EMAIL,
   canDeleteIssue,
+  canDeleteVisitor,
   demoIssues,
   todayKey,
 } from "./seed";
@@ -261,10 +262,21 @@ export function AppProvider({ children }) {
   }
 
   function deleteVisitor(visitorId) {
-    setState((prev) => ({
-      ...prev,
-      visitors: prev.visitors.filter((v) => v.id !== visitorId),
-    }));
+    let result = { ok: false, error: "Entry not found." };
+    setState((prev) => {
+      const visitor = (prev.visitors || []).find((v) => v.id === visitorId);
+      if (!visitor) return prev;
+      if (!canDeleteVisitor(visitor)) {
+        result = { ok: false, error: "Entries can only be deleted within 3 hours of logging." };
+        return prev;
+      }
+      result = { ok: true };
+      return {
+        ...prev,
+        visitors: prev.visitors.filter((v) => v.id !== visitorId),
+      };
+    });
+    return result;
   }
 
   const value = {

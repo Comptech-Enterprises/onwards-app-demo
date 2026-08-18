@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/lib/store";
-import { ISSUE_STATUSES, LOCATIONS, canDeleteIssue, taskById } from "@/lib/seed";
+import { ISSUE_STATUSES, LOCATIONS, canDeleteIssue, canDeleteVisitor, taskById } from "@/lib/seed";
 import { IssuePhoto } from "./PhotoLightbox";
 import StatusBadge from "./StatusBadge";
 import CmView from "./CmView";
@@ -431,15 +431,19 @@ function VisitorsTab({ visitors: allVisitors }) {
                   {v.arrivalTime && `In: ${v.arrivalTime}`}{v.punchOutTime && ` · Out: ${v.punchOutTime}`}{v.seats && ` · ${v.seats} seat${v.seats > 1 ? "s" : ""}`}{" · logged by "}{v.employeeName}
                 </span>
                 {v.payment && <span className="chip chip-ok">₹{v.payment}</span>}
-                <button
-                  type="button"
-                  className="btn-delete"
-                  onClick={() => {
-                    if (window.confirm("Delete this entry?")) deleteVisitor(v.id);
-                  }}
-                >
-                  Delete
-                </button>
+                {canDeleteVisitor(v) && (
+                  <button
+                    type="button"
+                    className="btn-delete"
+                    onClick={() => {
+                      if (!window.confirm("Delete this entry?")) return;
+                      const result = deleteVisitor(v.id);
+                      if (!result.ok) window.alert(result.error);
+                    }}
+                  >
+                    Delete
+                  </button>
+                )}
               </div>
             </li>
           ))}
