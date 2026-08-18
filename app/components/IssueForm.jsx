@@ -11,7 +11,7 @@ export default function IssueForm({ employeeId }) {
     () => users.find((u) => u.id === employeeId)?.location || LOCATIONS[0]
   );
   const [category, setCategory] = useState(ISSUE_CATEGORIES[0]);
-  const [description, setDescription] = useState("");
+  const [notes, setNotes] = useState("");
   const [photo, setPhoto] = useState(null);
   const [flash, setFlash] = useState("");
 
@@ -25,15 +25,15 @@ export default function IssueForm({ employeeId }) {
 
   function submit(e) {
     e.preventDefault();
-    if (!description.trim()) return;
+    if (!notes.trim()) return;
     addIssue({
       employeeId,
       location,
       category,
-      description: description.trim(),
+      notes: notes.trim(),
       photo,
     });
-    setDescription("");
+    setNotes("");
     setPhoto(null);
     setFlash(`Reported. Email sent to ${OPS_EMAIL}.`);
     setTimeout(() => setFlash(""), 3500);
@@ -62,12 +62,13 @@ export default function IssueForm({ employeeId }) {
       </label>
 
       <label className="field">
-        <span>What's the problem?</span>
+        <span>Notes</span>
         <textarea
-          rows={3}
-          placeholder="e.g. Coffee machine in the kitchen isn't working"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          rows={4}
+          placeholder="Describe what happened"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          required
         />
       </label>
 
