@@ -6,6 +6,7 @@ import {
   ALL_TASK_IDS,
   DEFAULT_STATUS,
   OPS_EMAIL,
+  canDeleteIssue,
   demoIssues,
   todayKey,
 } from "./seed";
@@ -242,10 +243,21 @@ export function AppProvider({ children }) {
   }
 
   function deleteIssue(issueId) {
-    setState((prev) => ({
-      ...prev,
-      issues: prev.issues.filter((i) => i.id !== issueId),
-    }));
+    let result = { ok: false, error: "Issue not found." };
+    setState((prev) => {
+      const issue = (prev.issues || []).find((i) => i.id === issueId);
+      if (!issue) return prev;
+      if (!canDeleteIssue(issue)) {
+        result = { ok: false, error: "Issues can only be deleted within 2 hours of reporting." };
+        return prev;
+      }
+      result = { ok: true };
+      return {
+        ...prev,
+        issues: prev.issues.filter((i) => i.id !== issueId),
+      };
+    });
+    return result;
   }
 
   function deleteVisitor(visitorId) {

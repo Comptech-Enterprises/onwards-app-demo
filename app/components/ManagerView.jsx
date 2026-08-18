@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/lib/store";
-import { ISSUE_STATUSES, LOCATIONS, taskById } from "@/lib/seed";
+import { ISSUE_STATUSES, LOCATIONS, canDeleteIssue, taskById } from "@/lib/seed";
 import { IssuePhoto } from "./PhotoLightbox";
 import StatusBadge from "./StatusBadge";
 import CmView from "./CmView";
@@ -281,15 +281,19 @@ function IssueItem({ issue: i }) {
           reported by {i.employeeName}
           {i.updatedAt && ` · updated ${timeOf(i.updatedAt)}`}
         </span>
-        <button
-          type="button"
-          className="btn-delete"
-          onClick={() => {
-            if (window.confirm("Delete this issue?")) deleteIssue(i.id);
-          }}
-        >
-          Delete
-        </button>
+        {canDeleteIssue(i) && (
+          <button
+            type="button"
+            className="btn-delete"
+            onClick={() => {
+              if (!window.confirm("Delete this issue?")) return;
+              const result = deleteIssue(i.id);
+              if (!result.ok) window.alert(result.error);
+            }}
+          >
+            Delete
+          </button>
+        )}
       </div>
     </li>
   );

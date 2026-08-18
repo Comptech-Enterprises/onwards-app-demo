@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useApp } from "@/lib/store";
-import { taskById, CATEGORIES, ISSUE_STATUSES } from "@/lib/seed";
+import { taskById, CATEGORIES, ISSUE_STATUSES, canDeleteIssue } from "@/lib/seed";
 import IssueForm from "./IssueForm";
 import VisitorForm from "./VisitorForm";
 import { IssuePhoto } from "./PhotoLightbox";
@@ -155,9 +155,6 @@ export default function EmployeeView() {
                       />
                     )}
                     <div className="issue-foot">
-                      <span className="muted small">
-                        ✉ notified {i.notifiedEmail}
-                      </span>
                       <label className="issue-status-set">
                         <span className="muted small">Status</span>
                         <select
@@ -171,15 +168,19 @@ export default function EmployeeView() {
                           ))}
                         </select>
                       </label>
-                      <button
-                        type="button"
-                        className="btn-delete"
-                        onClick={() => {
-                          if (window.confirm("Delete this issue?")) deleteIssue(i.id);
-                        }}
-                      >
-                        Delete
-                      </button>
+                      {canDeleteIssue(i) && (
+                        <button
+                          type="button"
+                          className="btn-delete"
+                          onClick={() => {
+                            if (!window.confirm("Delete this issue?")) return;
+                            const result = deleteIssue(i.id);
+                            if (!result.ok) window.alert(result.error);
+                          }}
+                        >
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </li>
                 ))}
