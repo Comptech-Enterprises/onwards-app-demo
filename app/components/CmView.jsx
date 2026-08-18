@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApp } from "@/lib/store";
 import { LOCATIONS } from "@/lib/seed";
 
@@ -18,15 +18,68 @@ function defaultPassword(name) {
   return first[0].toUpperCase() + first.slice(1).toLowerCase() + "@123";
 }
 
+const emptyForm = {
+  name: "",
+  employeeCode: "",
+  username: "",
+  password: "",
+  location: LOCATIONS[0],
+};
+
 export default function CmView() {
   const { user, users, addUser, deleteUser } = useApp();
-  const [name, setName] = useState("");
-  const [employeeCode, setEmployeeCode] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [location, setLocation] = useState(LOCATIONS[0]);
-  const [error, setError] = useState("");
+  const [open, setOpen] = useState(false);
   const [flash, setFlash] = useState("");
+
+  const staff = users.filter((u) => u.role === "employee");
+
+  function onAdded() {
+    setOpen(false);
+    setFlash("User added.");
+    setTimeout(() => setFlash(""), 3000);
+  }
+
+  return (
+    <div className="stack">
+      <UserGroup
+        title="Employees"
+        rows={staff}
+        currentId={user.id}
+        deleteUser={deleteUser}
+        flash={flash}
+        onAdd={() => setOpen(true)}
+      />
+      {open && (
+        <AddEmployeeModal
+          addUser={addUser}
+          onClose={() => setOpen(false)}
+          onAdded={onAdded}
+        />
+      )}
+    </div>
+  );
+}
+
+function AddEmployeeModal({ addUser, onClose, onAdded }) {
+  const [name, setName] = useState(emptyForm.name);
+  const [employeeCode, setEmployeeCode] = useState(emptyForm.employeeCode);
+  const [username, setUsername] = useState(emptyForm.username);
+  const [password, setPassword] = useState(emptyForm.password);
+  const [location, setLocation] = useState(emptyForm.location);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
 
   function onName(value) {
     setName(value);
@@ -48,26 +101,27 @@ export default function CmView() {
       setError(result.error);
       return;
     }
-    setName("");
-    setEmployeeCode("");
-    setUsername("");
-    setPassword("");
-    setLocation(LOCATIONS[0]);
-    setFlash("User added.");
-    setTimeout(() => setFlash(""), 3000);
+    onAdded();
   }
 
-  const staff = users.filter((u) => u.role === "employee");
-
   return (
-    <div className="stack">
-      <form className="card issue-form" onSubmit={submit}>
-        <div className="card-title">Add employee</div>
+    <div className="modal-wrap modal-wrap--form" role="dialog" aria-modal="true" aria-labelledby="add-employee-title">
+      <div className="modal-backdrop" onClick={onClose} aria-hidden="true" />
+      <form className="modal" onSubmit={submit}>
+        <div className="modal-head">
+          <strong className="modal-title" id="add-employee-title">
+            Add employee
+          </strong>
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
+            ✕
+          </button>
+        </div>
 
         <div className="form-row">
           <label className="field">
             <span>Name</span>
             <input
+              autoFocus
               value={name}
               onChange={(e) => onName(e.target.value)}
               placeholder="e.g. Riya Sharma"
@@ -120,30 +174,31 @@ export default function CmView() {
         </label>
 
         {error && <div className="login-error">{error}</div>}
-        {flash && <p className="muted">{flash}</p>}
 
-        <button type="submit" className="btn-primary">
-          Add employee
-        </button>
+        <div className="modal-actions">
+          <button type="button" className="btn-secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="btn-primary">
+            Add employee
+          </button>
+        </div>
       </form>
-
-      <UserGroup
-        title="Employees"
-        rows={staff}
-        currentId={user.id}
-        deleteUser={deleteUser}
-      />
     </div>
   );
 }
 
-function UserGroup({ title, rows, currentId, deleteUser }) {
+function UserGroup({ title, rows, currentId, deleteUser, flash, onAdd }) {
   return (
     <div className="card">
       <div className="card-title">
         {title}
         <span className="pill">{rows.length}</span>
+        <button type="button" className="btn-primary btn-compact" onClick={onAdd}>
+          Add employee
+        </button>
       </div>
+      {flash && <p className="flash">{flash}</p>}
       {rows.length === 0 ? (
         <p className="muted empty">None yet.</p>
       ) : (
