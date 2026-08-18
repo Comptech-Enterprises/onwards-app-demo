@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useApp } from "@/lib/store";
-import { taskById, CATEGORIES, ISSUE_STATUSES, canDeleteIssue } from "@/lib/seed";
+import { taskById, CATEGORIES, ISSUE_STATUSES, canDeleteIssue, canDeleteVisitor } from "@/lib/seed";
 import IssueForm from "./IssueForm";
 import VisitorForm from "./VisitorForm";
 import { IssuePhoto } from "./PhotoLightbox";
@@ -108,15 +108,19 @@ export default function EmployeeView() {
                         {v.arrivalTime && `In: ${v.arrivalTime}`}{v.punchOutTime && ` · Out: ${v.punchOutTime}`}{v.seats && ` · ${v.seats} seat${v.seats > 1 ? "s" : ""}`}
                       </span>
                       {v.payment && <span className="chip chip-ok">₹{v.payment}</span>}
-                      <button
-                        type="button"
-                        className="btn-delete"
-                        onClick={() => {
-                          if (window.confirm("Delete this entry?")) deleteVisitor(v.id);
-                        }}
-                      >
-                        Delete
-                      </button>
+                      {canDeleteVisitor(v) && (
+                        <button
+                          type="button"
+                          className="btn-delete"
+                          onClick={() => {
+                            if (!window.confirm("Delete this entry?")) return;
+                            const result = deleteVisitor(v.id);
+                            if (!result.ok) window.alert(result.error);
+                          }}
+                        >
+                          Delete
+                        </button>
+                      )}
                     </div>
                   </li>
                 ))}
