@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useApp } from "@/lib/store";
 import { LOCATIONS } from "@/lib/seed";
+import styles from "./CmView.module.css";
 
 function firstName(name) {
   return (name.trim().split(/\s+/)[0] || "");
@@ -190,7 +191,7 @@ function AddEmployeeModal({ addUser, onClose, onAdded }) {
 
 function UserGroup({ title, rows, currentId, deleteUser, flash, onAdd }) {
   return (
-    <div className="card">
+    <div className={styles.card}>
       <div className="card-title">
         {title}
         <span className="pill">{rows.length}</span>

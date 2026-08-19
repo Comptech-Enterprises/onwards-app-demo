@@ -23,11 +23,14 @@ import {
 import IssueForm from "./IssueForm";
 import VisitorForm from "./VisitorForm";
 import { IssuePhoto } from "./PhotoLightbox";
+import styles from "./EmployeeView.module.css";
 
 export default function EmployeeView() {
-  const { user, users, completions, reviewChecks, checklistPhotos, issues, visitors, toggleTask, addChecklistPhoto, removeChecklistPhoto, setIssueStatus, deleteIssue, deleteVisitor } = useApp();
-  const [tab, setTab] = useState("tasks");
+  const { user, users, completions, reviewChecks, checklistPhotos, issues, visitors, toggleTask, addChecklistPhoto, removeChecklistPhoto, setIssueStatus, deleteIssue, deleteVisitor, view } = useApp();
+  const tab = view === "issues" || view === "visitors" ? view : "tasks";
   const [reviewLocation, setReviewLocation] = useState(LOCATIONS[0]);
+  const [query, setQuery] = useState("");
+  const [chip, setChip] = useState("all");
 
   const currentEmployeeId = user.id;
   const employee = users.find((u) => u.id === currentEmployeeId) || user;
@@ -63,63 +66,75 @@ export default function EmployeeView() {
     ]);
   }, [reviewer, reviewChecks, activeLocation]);
 
-  const completedCount = grouped.reduce((sum, [category, tasks]) => {
-    const done = CATEGORY_REVIEWERS[category]
-      ? reviewDoneMap(reviewChecks, category, activeLocation)
-      : siteDone;
-    return sum + tasks.filter((t) => done[t.id]).length;
-  }, 0);
-  const pct = myTasks.length
-    ? Math.round((completedCount / myTasks.length) * 100)
-    : 0;
-
   const myIssues = issues.filter((i) => i.employeeId === currentEmployeeId);
   const myVisitors = visitors.filter((v) => v.employeeId === currentEmployeeId);
 
+  const visibleGroups = grouped.filter(([category, tasks]) => {
+    const q = query.trim().toLowerCase();
+    if (q && !category.toLowerCase().includes(q) && !tasks.some((t) => t.name.toLowerCase().includes(q))) {
+      return false;
+    }
+    const done = CATEGORY_REVIEWERS[category]
+      ? reviewDoneMap(reviewChecks, category, activeLocation)
+      : siteDone;
+    const doneCount = tasks.filter((t) => done[t.id]).length;
+    if (chip === "pending") return doneCount < tasks.length;
+    if (chip === "completed") return doneCount === tasks.length && tasks.length > 0;
+    return true;
+  });
+
   return (
     <section>
-      <div className="page-head">
+      {tab === "tasks" && (
+        <>
+      <div className="page-head page-head-stack">
         <div>
-          <h1>Hi, {employee.name.split(" ")[0]} 👋</h1>
+          <h1>Tasks</h1>
           <p className="muted">
             {reviewer
               ? `${reviewLocation} · Infra & Safety review`
-              : `${employee.location} · your tasks for today`}
+              : `${employee.location} · manage your assigned work`}
           </p>
         </div>
-        <div className="ring" style={{ "--pct": pct }}>
-          <span>{pct}%</span>
+      </div>
+      <label className="search-bar">
+        <span aria-hidden="true">⌕</span>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search tasks, category…"
+        />
+      </label>
+      <div className="chip-row" role="tablist" aria-label="Filter tasks">
+        {["all", "pending", "completed"].map((id) => (
+          <button
+            key={id}
+            type="button"
+            className={`chip-filter ${chip === id ? "active" : ""}`}
+            onClick={() => setChip(id)}
+          >
+            {id[0].toUpperCase() + id.slice(1)}
+          </button>
+        ))}
+      </div>
+        </>
+      )}
+      {tab === "issues" && (
+        <div className="page-head page-head-stack">
+          <div>
+            <h1>Issues</h1>
+            <p className="muted">Report and track site issues</p>
+          </div>
         </div>
-      </div>
-
-      <div className="tabs" role="tablist">
-        <button
-          role="tab"
-          className={tab === "tasks" ? "active" : ""}
-          onClick={() => setTab("tasks")}
-        >
-          Tasks
-          <span className="pill">
-            {completedCount}/{myTasks.length}
-          </span>
-        </button>
-        <button
-          role="tab"
-          className={tab === "issues" ? "active" : ""}
-          onClick={() => setTab("issues")}
-        >
-          Issues
-          {myIssues.length > 0 && <span className="pill">{myIssues.length}</span>}
-        </button>
-        <button
-          role="tab"
-          className={tab === "visitors" ? "active" : ""}
-          onClick={() => setTab("visitors")}
-        >
-          Value Added Services
-          {myVisitors.length > 0 && <span className="pill">{myVisitors.length}</span>}
-        </button>
-      </div>
+      )}
+      {tab === "visitors" && (
+        <div className="page-head page-head-stack">
+          <div>
+            <h1>VAS</h1>
+            <p className="muted">Value added services</p>
+          </div>
+        </div>
+      )}
 
       {tab === "tasks" ? (
         <div className="stack">
@@ -135,7 +150,7 @@ export default function EmployeeView() {
               </select>
             </label>
           )}
-          {grouped.map(([category, tasks]) => {
+          {visibleGroups.map(([category, tasks]) => {
             const owned = CATEGORY_REVIEWERS[category];
             const done = owned
               ? reviewDoneMap(reviewChecks, category, activeLocation)
@@ -174,7 +189,7 @@ export default function EmployeeView() {
       ) : tab === "visitors" ? (
         <div className="stack">
           <VisitorForm employeeId={currentEmployeeId} />
-          <div className="card">
+          <div className={styles.card}>
             <div className="card-title">Value added services logged today</div>
             {myVisitors.length === 0 ? (
               <p className="muted empty">No entries logged yet.</p>
@@ -216,7 +231,7 @@ export default function EmployeeView() {
       ) : (
         <div className="stack">
           <IssueForm employeeId={currentEmployeeId} />
-          <div className="card">
+          <div className={styles.card}>
             <div className="card-title">Your reported issues today</div>
             {myIssues.length === 0 ? (
               <p className="muted empty">No issues reported yet.</p>
@@ -296,24 +311,33 @@ function CategoryAccordion({
 }) {
   const doneCount = tasks.filter((t) => done[t.id]).length;
   const [open, setOpen] = useState(false);
+  const pct = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0;
   const gate = !readOnly && CHECKLIST_PHOTO_GATES[category];
   const locked = readOnly || (gate && !checklistPhotosReady(category, photos));
 
   return (
-    <div className="card accordion-card">
+    <div className={`${styles.card} ${styles.accordionCard}`}>
       <button
-        className="accordion-header"
+        className={styles.header}
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
       >
-        <span className="accordion-title">{category}</span>
-        <span className="accordion-meta">
-          <span className="pill">{doneCount}/{tasks.length}</span>
-          <span className={`accordion-chevron${open ? " open" : ""}`}>▾</span>
+      <div className={styles.cardTop}>
+        <span className={styles.title}>{category}</span>
+        <span className={`status-chip ${pct === 100 ? "chip-ok-tag" : "chip-pending-tag"}`}>
+          {pct === 100 ? "Complete" : "Pending"}
         </span>
+      </div>
+      <div className={styles.cardMeta}>
+        <span className="muted small">{doneCount}/{tasks.length} tasks</span>
+        <span className={`muted small ${styles.details}`}>View details</span>
+      </div>
+      <div className="progress-track" aria-hidden="true">
+        <span className="progress-fill" style={{ width: `${pct}%` }} />
+      </div>
       </button>
       {open && (
-        <div className="accordion-body">
+        <div className={styles.body}>
           {pendingNote && <p className="muted small review-note">{pendingNote}</p>}
           {gate && (
             <ChecklistPhotoGate
@@ -326,13 +350,13 @@ function CategoryAccordion({
               photosLocked={tasks.some((t) => frequencyOf(t) === "daily" && done[t.id])}
             />
           )}
-          <ul className="task-list">
+          <ul className={styles.taskList}>
             {tasks.map((t) => {
               const ts = done[t.id];
               return (
-                <li key={t.id} className={ts ? "task done" : locked ? "task locked" : "task"}>
+                <li key={t.id} className={`${styles.task}${ts ? ` ${styles.done}` : ""}${locked && !ts ? ` ${styles.locked}` : ""}`}>
                   <button
-                    className="check"
+                    className={styles.check}
                     aria-label={
                       ts
                         ? "Completed"
@@ -351,10 +375,10 @@ function CategoryAccordion({
                   >
                     {ts ? "✓" : ""}
                   </button>
-                  <div className="task-body">
-                    <span className="task-name">{t.name}</span>
+                  <div className={styles.taskBody}>
+                    <span className={styles.name}>{t.name}</span>
                     {ts && (
-                      <span className="task-time">
+                      <span className={styles.time}>
                         done at{" "}
                         {new Date(ts).toLocaleTimeString([], {
                           hour: "2-digit",
@@ -396,17 +420,17 @@ function ChecklistPhotoGate({ category, gate, employeeId, photos, onAdd, onRemov
   }
 
   return (
-    <div className="pantry-gate">
+    <div className={styles.gate}>
       <p className="muted small">{gate.hint}</p>
       {photos.length > 0 && (
-        <div className="pantry-photo-grid">
+        <div className={styles.photoGrid}>
           {photos.map((src, i) => (
-            <div key={`${i}-${src.slice(-12)}`} className="pantry-photo-slot">
+            <div key={`${i}-${src.slice(-12)}`} className={styles.photoSlot}>
               <IssuePhoto src={src} caption={`${caption} ${i + 1}`} />
               {!photosLocked && (
                 <button
                   type="button"
-                  className="btn-delete pantry-photo-remove"
+                  className={`btn-delete ${styles.photoRemove}`}
                   onClick={() => {
                     const result = onRemove(employeeId, category, i);
                     if (result && !result.ok) window.alert(result.error);

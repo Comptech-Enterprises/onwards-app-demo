@@ -19,9 +19,10 @@ import {
 import { IssuePhoto } from "./PhotoLightbox";
 import StatusBadge from "./StatusBadge";
 import CmView from "./CmView";
+import styles from "./ManagerView.module.css";
 
 export default function ManagerView() {
-  const { completions, reviewChecks, checklistPhotos, issues, visitors, employees, view: tab, setView: setTab } = useApp();
+  const { completions, reviewChecks, checklistPhotos, issues, visitors, employees, view: tab } = useApp();
   const [unit, setUnit] = useState("all");
   const [openId, setOpenId] = useState(null);
 
@@ -80,46 +81,23 @@ export default function ManagerView() {
 
   return (
     <section>
-      <div className="page-head">
+      <div className="page-head page-head-stack">
         <div>
-          <h1>Manager Dashboard</h1>
-          <p className="muted">Live view across all {centreCount} centres</p>
+          <h1>
+            {tab === "issues"
+              ? "Issues"
+              : tab === "visitors"
+                ? "VAS"
+                : tab === "cm"
+                  ? "CM"
+                  : "Home"}
+          </h1>
+          <p className="muted">
+            {tab === "dashboard"
+              ? `Live view across all ${centreCount} centres`
+              : "Manage centres and staff"}
+          </p>
         </div>
-      </div>
-
-      {/* Hidden on mobile — the hamburger drawer carries the same nav there. */}
-      <div className="tabs manager-tabs" role="tablist">
-        <button
-          role="tab"
-          className={tab === "dashboard" ? "active" : ""}
-          onClick={() => setTab("dashboard")}
-        >
-          Dashboard
-        </button>
-        <button
-          role="tab"
-          className={tab === "issues" ? "active" : ""}
-          onClick={() => setTab("issues")}
-        >
-          Issues
-          <span className="pill">{issues.length}</span>
-        </button>
-        <button
-          role="tab"
-          className={tab === "visitors" ? "active" : ""}
-          onClick={() => setTab("visitors")}
-        >
-          Value Added Services
-          {visitors.length > 0 && <span className="pill">{visitors.length}</span>}
-        </button>
-        <button
-          role="tab"
-          className={tab === "cm" ? "active" : ""}
-          onClick={() => setTab("cm")}
-        >
-          CM
-          <span className="pill">{employees.length}</span>
-        </button>
       </div>
 
       {tab === "cm" ? (
@@ -131,7 +109,7 @@ export default function ManagerView() {
       ) : (
         <>
       {/* Stat tiles */}
-      <div className="stat-grid">
+      <div className={styles.statGrid}>
         <StatTile label="Overall completion" value={`${totals.pct}%`} accent />
         <StatTile
           label="Tasks done"
@@ -149,7 +127,7 @@ export default function ManagerView() {
       </div>
 
       {/* All-employee task detail */}
-      <div className="card">
+      <div className={styles.card}>
         <div className="card-title">
           All employees — task detail
           <label className="unit-filter">
@@ -165,16 +143,20 @@ export default function ManagerView() {
           </label>
         </div>
         {/* Name + unit only; green once every task is ticked. Tap for detail. */}
-        <div className="people-grid">
+        <div className={styles.peopleGrid}>
           {detailRows.map((r) => (
             <button
               key={r.id}
               type="button"
-              className={`person-card ${r.pct === 100 ? "complete" : ""}`}
+              className={`${styles.person} ${r.pct === 100 ? styles.complete : ""}`}
               onClick={() => setOpenId(r.id)}
             >
-              <span className="person-name">{r.name}</span>
-              <span className="person-unit">{r.location}{r.employeeCode ? ` · ${r.employeeCode}` : ""}</span>
+              <span className={styles.personName}>{r.name}</span>
+              <span className={styles.personUnit}>{r.location}{r.employeeCode ? ` · ${r.employeeCode}` : ""}</span>
+              <div className="progress-track" aria-hidden="true">
+                <span className="progress-fill" style={{ width: `${r.pct}%` }} />
+              </div>
+              <span className="muted small">{r.completed}/{r.total} · {r.pct}%</span>
             </button>
           ))}
         </div>
@@ -222,7 +204,7 @@ function IssuesTab({ issues: allIssues }) {
   );
 
   return (
-    <div className="card">
+    <div className={styles.card}>
       <div className="card-title">
         Reported issues today
         <span className="pill">{allIssues.length}</span>
@@ -504,7 +486,7 @@ function VisitorsTab({ visitors: allVisitors }) {
   const totalPaid = visible.reduce((sum, v) => sum + (parseFloat(v.amountPaid) || 0), 0);
 
   return (
-    <div className="card">
+    <div className={styles.card}>
       <div className="card-title">
         Value Added Services today
         <span className="pill">{allVisitors.length}</span>
@@ -519,14 +501,14 @@ function VisitorsTab({ visitors: allVisitors }) {
         </label>
       </div>
 
-      <div className="stat-grid" style={{ marginBottom: "12px" }}>
-        <div className="stat-tile accent">
-          <div className="stat-value">{visible.length}</div>
-          <div className="stat-label">Total entries{unit !== "all" ? ` · ${unit}` : ""}</div>
+      <div className={styles.statGrid} style={{ marginBottom: "12px" }}>
+        <div className={`${styles.tile} ${styles.accent}`}>
+          <div className={styles.value}>{visible.length}</div>
+          <div className={styles.label}>Total entries{unit !== "all" ? ` · ${unit}` : ""}</div>
         </div>
-        <div className="stat-tile">
-          <div className="stat-value">₹{totalPaid.toLocaleString()}</div>
-          <div className="stat-label">Amount collected</div>
+        <div className={styles.tile}>
+          <div className={styles.value}>₹{totalPaid.toLocaleString()}</div>
+          <div className={styles.label}>Amount collected</div>
         </div>
       </div>
 
@@ -579,7 +561,7 @@ function PhotoReview({ label, photos, captionPrefix }) {
       {list.length === 0 ? (
         <p className="muted empty">No photos uploaded.</p>
       ) : (
-        <div className="pantry-photo-grid">
+        <div className={styles.photoGrid}>
           {list.map((src, i) => (
             <IssuePhoto key={`${captionPrefix}-${i}`} src={src} caption={`${captionPrefix} ${i + 1}`} />
           ))}
@@ -591,9 +573,9 @@ function PhotoReview({ label, photos, captionPrefix }) {
 
 function StatTile({ label, value, accent, warn }) {
   return (
-    <div className={`stat-tile ${accent ? "accent" : ""} ${warn ? "warn" : ""}`}>
-      <div className="stat-value">{value}</div>
-      <div className="stat-label">{label}</div>
+    <div className={`${styles.tile} ${accent ? styles.accent : ""} ${warn ? styles.warn : ""}`}>
+      <div className={styles.value}>{value}</div>
+      <div className={styles.label}>{label}</div>
     </div>
   );
 }

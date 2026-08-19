@@ -5,9 +5,13 @@ import Header from "./components/Header";
 import EmployeeView from "./components/EmployeeView";
 import ManagerView from "./components/ManagerView";
 import Login from "./components/Login";
+import TaskReminder from "./components/TaskReminder";
+import BottomNav from "./components/BottomNav";
+import AlertsView from "./components/AlertsView";
+import ProfileView from "./components/ProfileView";
 
 export default function Home() {
-  const { user, hydrated } = useApp();
+  const { user, hydrated, view } = useApp();
 
   if (!hydrated) {
     return (
@@ -21,15 +25,18 @@ export default function Home() {
 
   if (!user) return <Login />;
 
+  let body;
+  if (view === "profile") body = <ProfileView />;
+  else if (view === "alerts") body = <AlertsView />;
+  else if (user.role === "manager") body = <ManagerView />;
+  else body = <EmployeeView />;
+
   return (
-    <div className="app">
+    <div className="app app-with-nav">
       <Header />
-      <main className="container">
-        {user.role === "manager" ? <ManagerView /> : <EmployeeView />}
-      </main>
-      <footer className="footer">
-        Comptech Enterprises · Technology · Innovation · Integrity
-      </footer>
+      <TaskReminder />
+      <main className="container">{body}</main>
+      <BottomNav />
     </div>
   );
 }

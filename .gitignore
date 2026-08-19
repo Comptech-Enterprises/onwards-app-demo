@@ -33,5 +33,8 @@ next-env.d.ts
 # claude
 .claude
 
+# local brainstorm / visual companion
+.superpowers/
+
 # local credentials export (do not serve)
 /credentials.xlsx

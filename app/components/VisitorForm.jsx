@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useApp } from "@/lib/store";
 import { LOCATIONS } from "@/lib/seed";
+import styles from "./VisitorForm.module.css";
 
 const FACILITY_TYPES = ["Meeting Room", "Day Pass", "Virtual Office", "Shooting"];
 const AGGREGATORS = ["myHQ", "Qdesq", "SimplyWork", "Cofynd", "SpaceN", "Stylework", "EasyDesq", "InstantOffice", "Lease Circle", "Direct / Other"];
@@ -43,7 +44,7 @@ export default function VisitorForm({ employeeId }) {
   }
 
   return (
-    <form className="card issue-form" onSubmit={submit}>
+    <form className={styles.card} onSubmit={submit}>
       <div className="card-title">Add entry</div>
 
       <div className="form-row">

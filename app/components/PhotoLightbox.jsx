@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import styles from "./PhotoLightbox.module.css";
 
 // A tappable issue photo. Opens the full image over the page — the thumbnails
 // are cropped to a fixed height, so detail is only readable enlarged.
@@ -11,12 +12,12 @@ export function IssuePhoto({ src, caption }) {
     <>
       <button
         type="button"
-        className="issue-photo-btn"
+        className={`${styles.btn} issue-photo-btn`}
         onClick={() => setOpen(true)}
         aria-label="View photo full size"
       >
         <img className="issue-photo" src={src} alt="attachment" />
-        <span className="issue-photo-hint">Tap to enlarge</span>
+        <span className={styles.hint}>Tap to enlarge</span>
       </button>
       {open && (
         <PhotoLightbox src={src} caption={caption} onClose={() => setOpen(false)} />
@@ -40,12 +41,12 @@ function PhotoLightbox({ src, caption, onClose }) {
   }, [onClose]);
 
   return (
-    <div className="lightbox" role="dialog" aria-modal="true" aria-label="Issue photo">
+    <div className={styles.lightbox} role="dialog" aria-modal="true" aria-label="Issue photo">
       <div className="modal-backdrop" onClick={onClose} aria-hidden="true" />
-      <button className="lightbox-close" onClick={onClose} aria-label="Close">
+      <button className={styles.close} onClick={onClose} aria-label="Close">
         ✕
       </button>
-      <figure className="lightbox-figure">
+      <figure className={styles.figure}>
         <img src={src} alt="Issue attachment, full size" />
         {caption && <figcaption>{caption}</figcaption>}
       </figure>
