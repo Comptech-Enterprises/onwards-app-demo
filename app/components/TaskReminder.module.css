@@ -1,0 +1,38 @@
+.banner {
+  composes: panel from "./glass.module.css";
+  margin: 12px auto 0;
+  width: calc(100% - 32px);
+  max-width: 1080px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.banner.warn {
+  border-color: color-mix(in srgb, var(--warn) 45%, var(--glass-border));
+}
+
+.copy {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.copy span {
+  display: block;
+  margin-top: 4px;
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.dismiss {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 6px;
+}

@@ -1,0 +1,32 @@
+.card {
+  composes: panel from "./glass.module.css";
+  padding: 22px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--brand), var(--brand-ink));
+  color: #fff;
+  font-weight: 800;
+  font-size: 24px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 6px;
+}
+
+.name {
+  margin: 0;
+  font-size: 20px;
+}
+
+.meta {
+  margin: 0;
+  font-size: 13px;
+}

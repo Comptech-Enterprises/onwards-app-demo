@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useApp } from "@/lib/store";
 import { ISSUE_CATEGORIES, LOCATIONS, OPS_EMAIL } from "@/lib/seed";
+import styles from "./IssueForm.module.css";
 
 export default function IssueForm({ employeeId }) {
   const { addIssue, users } = useApp();
@@ -40,7 +41,7 @@ export default function IssueForm({ employeeId }) {
   }
 
   return (
-    <form className="card issue-form" onSubmit={submit}>
+    <form className={styles.card} onSubmit={submit}>
       <div className="card-title">Report an issue</div>
 
       <label className="field">

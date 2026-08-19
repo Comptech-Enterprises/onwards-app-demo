@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useApp } from "@/lib/store";
 import Logo from "./Logo";
+import styles from "./Login.module.css";
 
 export default function Login() {
   const { login } = useApp();
@@ -19,15 +20,15 @@ export default function Login() {
   }
 
   return (
-    <div className="login-screen">
-      <form className="login-card" onSubmit={submit}>
-        <div className="brand login-brand">
-          <Logo className="login-logo" />
-          <span className="brand-date">Daily Task Management</span>
+    <div className={`login-screen ${styles.screen}`}>
+      <form className={styles.card} onSubmit={submit}>
+        <div className={styles.brand}>
+          <Logo className={styles.logo} />
+          <span className="muted small">Daily Task Management</span>
         </div>
 
-        <h1 className="login-title">Sign in</h1>
-        <p className="muted login-sub">Use your assigned credentials.</p>
+        <h1 className={styles.title}>Sign in</h1>
+        <p className={`muted ${styles.sub}`}>Use your assigned credentials.</p>
 
         <label className="field">
           <span>Username</span>
@@ -46,7 +47,7 @@ export default function Login() {
 
         <label className="field">
           <span>Password</span>
-          <div className="pw-wrap">
+          <div className={styles.pwWrap}>
             <input
               type={show ? "text" : "password"}
               value={password}
@@ -58,7 +59,7 @@ export default function Login() {
             />
             <button
               type="button"
-              className="pw-toggle"
+              className={styles.pwToggle}
               onClick={() => setShow((s) => !s)}
             >
               {show ? "Hide" : "Show"}

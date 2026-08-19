@@ -1,0 +1,4 @@
+.card {
+  composes: panel from "./glass.module.css";
+  padding: 16px;
+}

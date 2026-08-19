@@ -1,0 +1,50 @@
+.screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.card {
+  composes: panel from "./glass.module.css";
+  width: 100%;
+  max-width: 380px;
+  padding: 26px 24px;
+  border-radius: 18px;
+}
+
+.brand {
+  margin-bottom: 18px;
+}
+
+.logo :global(.logo-img) {
+  height: 38px;
+}
+
+.title {
+  margin: 0;
+  font-size: 22px;
+}
+
+.sub {
+  margin: 4px 0 18px;
+  font-size: 13px;
+}
+
+.pwWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pwToggle {
+  position: absolute;
+  right: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 6px;
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import SEED_USERS from "./credentials.json";
 import {
   CATEGORY_REVIEWERS,
@@ -26,6 +26,7 @@ import {
 const STORAGE_KEY = "onward-task-state-v2";
 const SESSION_KEY = "onward-session-v2";
 const USERS_KEY = "onward-users-v1";
+const ALERTS_KEY = "onward-alerts-v1";
 
 const AppContext = createContext(null);
 
@@ -140,6 +141,21 @@ function withoutPassword(record) {
   return safe;
 }
 
+function loadAlerts() {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(ALERTS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function defaultViewFor(role) {
+  return role === "manager" ? "dashboard" : "tasks";
+}
+
 export function AppProvider({ children }) {
   const [user, setUser] = useState(null); // signed-in user (no password)
   const [users, setUsers] = useState(cloneSeedUsers);
@@ -147,13 +163,17 @@ export function AppProvider({ children }) {
   const [hydrated, setHydrated] = useState(false);
   // Which manager section is showing. Lives here so the header drawer can
   // switch it on mobile, where the tab row is hidden.
-  const [view, setView] = useState("dashboard");
+  const [view, setView] = useState("tasks");
+  const [alerts, setAlerts] = useState([]);
 
   // Re-read from localStorage after mount to avoid SSR mismatch.
   useEffect(() => {
+    const session = loadSession();
     setState(loadState());
     setUsers(loadUsers());
-    setUser(loadSession());
+    setUser(session);
+    setAlerts(loadAlerts());
+    if (session) setView(defaultViewFor(session.role));
     setHydrated(true);
   }, []);
 
@@ -167,6 +187,11 @@ export function AppProvider({ children }) {
     window.localStorage.setItem(USERS_KEY, JSON.stringify(users));
   }, [users, hydrated]);
 
+  useEffect(() => {
+    if (!hydrated) return;
+    window.localStorage.setItem(ALERTS_KEY, JSON.stringify(alerts));
+  }, [alerts, hydrated]);
+
   function login(username, password) {
     const u = username.trim().toLowerCase();
     const found = users.find(
@@ -175,15 +200,31 @@ export function AppProvider({ children }) {
     if (!found) return false;
     const safe = withoutPassword(found);
     setUser(safe);
+    setView(defaultViewFor(found.role));
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(safe));
     return true;
   }
 
   function logout() {
     setUser(null);
-    setView("dashboard");
+    setView("tasks");
     window.localStorage.removeItem(SESSION_KEY);
   }
+
+  const addAlert = useCallback((alert) => {
+    setAlerts((prev) => {
+      if (prev.some((a) => a.id === alert.id)) return prev;
+      return [alert, ...prev].slice(0, 80);
+    });
+  }, []);
+
+  const markAlertRead = useCallback((id) => {
+    setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, read: true } : a)));
+  }, []);
+
+  const markAllAlertsRead = useCallback(() => {
+    setAlerts((prev) => prev.map((a) => ({ ...a, read: true })));
+  }, []);
 
   function toggleTask(employeeId, taskId, location) {
     let result = { ok: true };
@@ -459,6 +500,10 @@ export function AppProvider({ children }) {
     deleteVisitor,
     addUser,
     deleteUser,
+    alerts,
+    addAlert,
+    markAlertRead,
+    markAllAlertsRead,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
