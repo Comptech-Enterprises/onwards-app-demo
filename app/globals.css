@@ -16,49 +16,20 @@
   --shadow: 0 1px 2px rgba(7, 34, 71, 0.06), 0 8px 24px rgba(7, 34, 71, 0.08);
   --radius: 14px;
   --blur: 8px;
-  --glass: var(--surface);
-  --glass-strong: var(--surface-2);
+  --glass: var(--surface-2);
+  --glass-strong: var(--surface);
   --glass-border: var(--border);
   --mesh: linear-gradient(135deg, #fff9f5 0%, #f5c9bc 42%, #c5d4ec 100%);
 }
 
 @supports ((backdrop-filter: blur(8px)) or (-webkit-backdrop-filter: blur(8px))) {
   :root {
-    --glass: rgba(255, 255, 255, 0.82);
-    --glass-strong: rgba(255, 255, 255, 0.9);
-    --glass-border: rgba(255, 255, 255, 0.7);
+    --glass: rgba(255, 249, 245, 0.88);
+    --glass-strong: rgba(253, 244, 239, 0.94);
+    --glass-border: rgba(239, 224, 215, 0.7);
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #06182e;
-    --surface: #0b2444;
-    --surface-2: #102d52;
-    --border: #1c3c67;
-    --text: #eaf1fa;
-    --muted: #93a7c2;
-    --brand: #ef6a49;
-    --brand-ink: #f87a0a;
-    --ok: #2bbd86;
-    --ok-soft: #0f3a2d;
-    --warn: #f89a3f;
-    --warn-soft: #3d2a12;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px rgba(0, 0, 0, 0.35);
-    --glass: var(--surface);
-    --glass-strong: var(--surface-2);
-    --glass-border: var(--border);
-    --mesh: linear-gradient(135deg, #06182e 0%, #1a3a68 42%, #3d1e18 100%);
-  }
-
-  @supports ((backdrop-filter: blur(8px)) or (-webkit-backdrop-filter: blur(8px))) {
-    :root {
-      --glass: rgba(11, 36, 68, 0.82);
-      --glass-strong: rgba(16, 45, 82, 0.9);
-      --glass-border: rgba(255, 255, 255, 0.12);
-    }
-  }
-}
 
 * {
   box-sizing: border-box;
@@ -119,14 +90,6 @@ body::before {
 }
 .logo-on-dark {
   display: none;
-}
-@media (prefers-color-scheme: dark) {
-  .logo-on-light {
-    display: none;
-  }
-  .logo-on-dark {
-    display: block;
-  }
 }
 
 .app-with-nav main.container {

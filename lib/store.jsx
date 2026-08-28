@@ -458,6 +458,66 @@ export function AppProvider({ children }) {
     return result;
   }
 
+  // Clear own completions — calls API then wipes from local state.
+  async function clearMyCompletions(employeeId) {
+    await fetch("/api/completions/my", { method: "DELETE" });
+    setState((prev) => ({
+      ...prev,
+      completions: { ...prev.completions, [employeeId]: {} },
+    }));
+  }
+
+  // Manager: clear another user's completions.
+  async function clearUserCompletions(userId) {
+    await fetch(`/api/completions/user/${userId}`, { method: "DELETE" });
+    setState((prev) => ({
+      ...prev,
+      completions: { ...prev.completions, [userId]: {} },
+    }));
+  }
+
+  // Clear own R2 photos from issues + remove them from state.
+  async function clearMyPhotos(employeeId) {
+    const myIssues = (state.issues || []).filter(
+      (i) => i.employeeId === employeeId && i.photo
+    );
+    const urls = myIssues.map((i) => i.photo).filter(Boolean);
+    if (urls.length) {
+      await fetch("/api/photos/my", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls }),
+      });
+    }
+    setState((prev) => ({
+      ...prev,
+      issues: prev.issues.map((i) =>
+        i.employeeId === employeeId ? { ...i, photo: null } : i
+      ),
+    }));
+  }
+
+  // Manager: clear another user's R2 photos.
+  async function clearUserPhotos(userId) {
+    const userIssues = (state.issues || []).filter(
+      (i) => i.employeeId === userId && i.photo
+    );
+    const urls = userIssues.map((i) => i.photo).filter(Boolean);
+    if (urls.length) {
+      await fetch(`/api/photos/user/${userId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls }),
+      });
+    }
+    setState((prev) => ({
+      ...prev,
+      issues: prev.issues.map((i) =>
+        i.employeeId === userId ? { ...i, photo: null } : i
+      ),
+    }));
+  }
+
   function deleteVisitor(visitorId) {
     let result = { ok: false, error: "Entry not found." };
     setState((prev) => {
@@ -500,6 +560,10 @@ export function AppProvider({ children }) {
     deleteVisitor,
     addUser,
     deleteUser,
+    clearMyCompletions,
+    clearUserCompletions,
+    clearMyPhotos,
+    clearUserPhotos,
     alerts,
     addAlert,
     markAlertRead,

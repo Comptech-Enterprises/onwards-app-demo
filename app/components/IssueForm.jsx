@@ -14,14 +14,25 @@ export default function IssueForm({ employeeId }) {
   const [category, setCategory] = useState(ISSUE_CATEGORIES[0]);
   const [notes, setNotes] = useState("");
   const [photo, setPhoto] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const [flash, setFlash] = useState("");
 
-  function onFile(e) {
+  async function onFile(e) {
     const file = e.target.files?.[0];
     if (!file) return setPhoto(null);
-    const reader = new FileReader();
-    reader.onload = () => setPhoto(reader.result);
-    reader.readAsDataURL(file);
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      setPhoto(data.url || null);
+    } catch {
+      setFlash("Photo upload failed.");
+      setTimeout(() => setFlash(""), 3000);
+    } finally {
+      setUploading(false);
+    }
   }
 
   function submit(e) {
@@ -74,14 +85,14 @@ export default function IssueForm({ employeeId }) {
       </label>
 
       <label className="field">
-        <span>Photo (optional)</span>
-        <input type="file" accept="image/*" onChange={onFile} />
+        <span>Photo (optional){uploading ? " — uploading…" : ""}</span>
+        <input type="file" accept="image/*" onChange={onFile} disabled={uploading} />
       </label>
 
       {photo && <img className="issue-photo preview" src={photo} alt="preview" />}
 
-      <button type="submit" className="btn-primary">
-        Submit issue
+      <button type="submit" className="btn-primary" disabled={uploading}>
+        {uploading ? "Uploading…" : "Submit issue"}
       </button>
 
       {flash && <div className="flash">{flash}</div>}
