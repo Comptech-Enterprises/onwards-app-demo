@@ -10,12 +10,28 @@ export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const [show, setShow] = useState(false);
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
-    if (!login(username, password)) {
-      setError("Invalid username or password.");
+    if (!username.trim() || !password) {
+      setError("Please enter your username and password.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await login(username, password);
+      if (!res.ok) {
+        setError(res.error || "Invalid username or password.");
+      }
+    } catch {
+      setError("Unable to connect to server. Please try again.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -42,6 +58,7 @@ export default function Login() {
               setError("");
             }}
             placeholder="e.g. amit"
+            disabled={loading}
           />
         </label>
 
@@ -56,11 +73,13 @@ export default function Login() {
                 setError("");
               }}
               placeholder="••••••••"
+              disabled={loading}
             />
             <button
               type="button"
               className={styles.pwToggle}
               onClick={() => setShow((s) => !s)}
+              disabled={loading}
             >
               {show ? "Hide" : "Show"}
             </button>
@@ -69,8 +88,8 @@ export default function Login() {
 
         {error && <div className="login-error">{error}</div>}
 
-        <button type="submit" className="btn-primary">
-          Sign in
+        <button type="submit" className="btn-primary" disabled={loading}>
+          {loading ? "Signing in…" : "Sign in"}
         </button>
       </form>
     </div>

@@ -7,48 +7,58 @@ import styles from "./IssueForm.module.css";
 
 export default function IssueForm({ employeeId }) {
   const { addIssue, users } = useApp();
-  // Defaults to the reporter's own unit, but they can switch it.
   const [location, setLocation] = useState(
     () => users.find((u) => u.id === employeeId)?.location || LOCATIONS[0]
   );
   const [category, setCategory] = useState(ISSUE_CATEGORIES[0]);
   const [notes, setNotes] = useState("");
-  const [photo, setPhoto] = useState(null);
-  const [uploading, setUploading] = useState(false);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
   const [flash, setFlash] = useState("");
 
-  async function onFile(e) {
+  function onFile(e) {
     const file = e.target.files?.[0];
-    if (!file) return setPhoto(null);
-    setUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: fd });
-      const data = await res.json();
-      setPhoto(data.url || null);
-    } catch {
-      setFlash("Photo upload failed.");
-      setTimeout(() => setFlash(""), 3000);
-    } finally {
-      setUploading(false);
+    if (!file) {
+      setPhotoFile(null);
+      setPreviewUrl(null);
+      return;
     }
+    setPhotoFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
   }
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
     if (!notes.trim()) return;
-    addIssue({
-      employeeId,
-      location,
-      category,
-      notes: notes.trim(),
-      photo,
-    });
-    setNotes("");
-    setPhoto(null);
-    setFlash(`Reported. Email sent to ${OPS_EMAIL}.`);
-    setTimeout(() => setFlash(""), 3500);
+
+    setSubmitting(true);
+    try {
+      const res = await addIssue({
+        employeeId,
+        location,
+        category,
+        notes: notes.trim(),
+        description: notes.trim(),
+        photo: photoFile,
+      });
+
+      if (res?.ok) {
+        setNotes("");
+        setPhotoFile(null);
+        setPreviewUrl(null);
+        setFlash(`Reported. Email sent to ${OPS_EMAIL}.`);
+        setTimeout(() => setFlash(""), 3500);
+      } else {
+        setFlash(res?.error || "Failed to submit issue.");
+        setTimeout(() => setFlash(""), 3500);
+      }
+    } catch {
+      setFlash("Could not submit issue. Please check your connection.");
+      setTimeout(() => setFlash(""), 3500);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -85,14 +95,14 @@ export default function IssueForm({ employeeId }) {
       </label>
 
       <label className="field">
-        <span>Photo (optional){uploading ? " — uploading…" : ""}</span>
-        <input type="file" accept="image/*" onChange={onFile} disabled={uploading} />
+        <span>Photo (optional)</span>
+        <input type="file" accept="image/*" onChange={onFile} disabled={submitting} />
       </label>
 
-      {photo && <img className="issue-photo preview" src={photo} alt="preview" />}
+      {previewUrl && <img className="issue-photo preview" src={previewUrl} alt="preview" />}
 
-      <button type="submit" className="btn-primary" disabled={uploading}>
-        {uploading ? "Uploading…" : "Submit issue"}
+      <button type="submit" className="btn-primary" disabled={submitting}>
+        {submitting ? "Submitting…" : "Submit issue"}
       </button>
 
       {flash && <div className="flash">{flash}</div>}

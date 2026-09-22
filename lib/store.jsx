@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import api, { ApiError } from "./api";
 import SEED_USERS from "./credentials.json";
 import {
   CATEGORY_REVIEWERS,
@@ -10,530 +11,459 @@ import {
   canDeleteIssue,
   canDeleteVisitor,
   checklistPhotosReady,
-  demoIssues,
   frequencyOf,
   isCategoryReviewer,
   isCompletionLive,
   photoList,
-  pruneCompletions,
-  pruneReviewChecks,
   taskById,
   taskIdsForUser,
   tasksForCategory,
   todayKey,
 } from "./seed";
 
-const STORAGE_KEY = "onward-task-state-v2";
 const SESSION_KEY = "onward-session-v2";
-const USERS_KEY = "onward-users-v1";
-const ALERTS_KEY = "onward-alerts-v1";
+const TOKEN_KEY = "token";
 
 const AppContext = createContext(null);
-
-function freshState() {
-  return {
-    date: todayKey(),
-    // completions[employeeId][taskId] = ISO timestamp
-    completions: {},
-    // issues: newest first — pre-seeded with demo reports across the units
-    issues: demoIssues(),
-    // visitors: walk-ins logged by employees, newest first
-    visitors: [],
-    // checklistPhotos[employeeId][category] = data-URL list
-    checklistPhotos: {},
-    // reviewChecks[category][location][taskId] = ISO timestamp (Ravi / Infra & Safety)
-    reviewChecks: {},
-  };
-}
-
-function loadState() {
-  const fresh = freshState();
-  if (typeof window === "undefined") return fresh;
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return fresh;
-    const parsed = JSON.parse(raw);
-    const completions = pruneCompletions(parsed.completions);
-    const reviewChecks = pruneReviewChecks(parsed.reviewChecks);
-
-    // New day: issues, visitors and photos reset. Weekly/monthly ticks stay.
-    if (parsed.date !== todayKey()) {
-      return {
-        ...fresh,
-        completions,
-        reviewChecks,
-      };
-    }
-
-    const merged = { ...fresh, ...parsed };
-    merged.issues = (merged.issues || []).map((i) => ({
-      status: DEFAULT_STATUS,
-      ...i,
-      notes: i.notes || i.description || "",
-    }));
-    merged.checklistPhotos = loadChecklistPhotos(parsed);
-    merged.completions = completions;
-    merged.reviewChecks = reviewChecks;
-    return merged;
-  } catch {
-    return fresh;
-  }
-}
-
-function loadSession() {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-
-function cloneSeedUsers() {
-  return withCatalogueTasks(JSON.parse(JSON.stringify(SEED_USERS)));
-}
-
-function withCatalogueTasks(users) {
-  return users.map((u) =>
-    u.role === "employee" ? { ...u, taskIds: taskIdsForUser(u) } : u
-  );
-}
-
-function emptyChecklistPhotos() {
-  return { Pantry: [], Washroom: [], "Common Areas": [], "Soft Services": [] };
-}
-
-function loadChecklistPhotos(parsed) {
-  const out = {};
-  for (const [id, cats] of Object.entries(parsed.checklistPhotos || {})) {
-    out[id] = {
-      ...emptyChecklistPhotos(),
-      Pantry: photoList(cats?.Pantry),
-      Washroom: photoList(cats?.Washroom),
-      "Common Areas": photoList(cats?.["Common Areas"]),
-      "Soft Services": photoList(cats?.["Soft Services"]),
-    };
-  }
-  for (const [id, rec] of Object.entries(parsed.pantryPhotos || {})) {
-    if (!out[id]) out[id] = emptyChecklistPhotos();
-    if (!out[id].Pantry.length) out[id].Pantry = photoList(rec);
-  }
-  return out;
-}
-
-function loadUsers() {
-  if (typeof window === "undefined") return cloneSeedUsers();
-  try {
-    const raw = window.localStorage.getItem(USERS_KEY);
-    if (!raw) return cloneSeedUsers();
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) return cloneSeedUsers();
-    return withCatalogueTasks(parsed);
-  } catch {
-    return cloneSeedUsers();
-  }
-}
-
-function withoutPassword(record) {
-  const { password: _pw, ...safe } = record;
-  return safe;
-}
-
-function loadAlerts() {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(ALERTS_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
 
 function defaultViewFor(role) {
   return role === "manager" ? "dashboard" : "tasks";
 }
 
-export function AppProvider({ children }) {
-  const [user, setUser] = useState(null); // signed-in user (no password)
-  const [users, setUsers] = useState(cloneSeedUsers);
-  const [state, setState] = useState(freshState);
-  const [hydrated, setHydrated] = useState(false);
-  // Which manager section is showing. Lives here so the header drawer can
-  // switch it on mobile, where the tab row is hidden.
-  const [view, setView] = useState("tasks");
-  const [alerts, setAlerts] = useState([]);
+function dataUrlToBlob(dataUrl) {
+  const arr = dataUrl.split(",");
+  const mime = arr[0].match(/:(.*?);/)?.[1] || "image/jpeg";
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: mime });
+}
 
-  // Re-read from localStorage after mount to avoid SSR mismatch.
-  useEffect(() => {
-    const session = loadSession();
-    setState(loadState());
-    setUsers(loadUsers());
-    setUser(session);
-    setAlerts(loadAlerts());
-    if (session) setView(defaultViewFor(session.role));
-    setHydrated(true);
+export function AppProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [users, setUsers] = useState(SEED_USERS);
+  const [completions, setCompletions] = useState({});
+  const [reviewChecks, setReviewChecks] = useState({});
+  const [checklistPhotos, setChecklistPhotos] = useState({});
+  const [issues, setIssues] = useState([]);
+  const [visitors, setVisitors] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [hydrated, setHydrated] = useState(false);
+  const [view, setView] = useState("tasks");
+  const wsRef = useRef(null);
+
+  const fetchInitialData = useCallback(async (currentUser) => {
+    if (!currentUser) return;
+    try {
+      const isManager = currentUser.role === "manager" || currentUser.designation === "cm";
+
+      // Parallel data fetching from live backend
+      const promises = [
+        api.get("/tasks").catch(() => []),
+        api.get("/issues").catch(() => []),
+        api.get("/visitors").catch(() => []),
+        api.get("/alerts").catch(() => []),
+        isManager ? api.get("/completions/all").catch(() => ({})) : api.get("/completions/my").catch(() => ({})),
+        isManager ? api.get("/photos/all").catch(() => ({})) : api.get("/photos/my").catch(() => ({})),
+      ];
+
+      if (isManager) {
+        promises.push(api.get("/users").catch(() => SEED_USERS));
+      }
+
+      const results = await Promise.all(promises);
+      const [tasksRes, issuesRes, visitorsRes, alertsRes, compRes, photosRes, usersRes] = results;
+
+      if (Array.isArray(issuesRes)) setIssues(issuesRes);
+      if (Array.isArray(visitorsRes)) setVisitors(visitorsRes);
+      if (Array.isArray(alertsRes)) setAlerts(alertsRes);
+
+      if (usersRes && Array.isArray(usersRes)) {
+        setUsers(usersRes.map((u) => ({ ...u, taskIds: u.taskIds || taskIdsForUser(u) })));
+      }
+
+      // Handle completions mapping
+      if (compRes) {
+        if (isManager) {
+          setCompletions(compRes);
+        } else {
+          setCompletions({ [currentUser.id]: compRes });
+        }
+      }
+
+      // Handle photos mapping
+      if (photosRes) {
+        if (isManager) {
+          setChecklistPhotos(photosRes);
+        } else {
+          setChecklistPhotos({ [currentUser.id]: photosRes });
+        }
+      }
+    } catch (err) {
+      console.warn("Could not fetch all initial backend data:", err);
+    }
   }, []);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state, hydrated]);
+  // Initialize WebSocket connection for real-time checklist sync
+  const connectWebSocket = useCallback((token) => {
+    if (typeof window === "undefined" || !token) return;
+    if (wsRef.current) {
+      wsRef.current.close();
+    }
 
-  useEffect(() => {
-    if (!hydrated) return;
-    window.localStorage.setItem(USERS_KEY, JSON.stringify(users));
-  }, [users, hydrated]);
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "wss://app.onwardworkspaces.com/ws";
+    try {
+      const ws = new WebSocket(`${wsUrl}?token=${token}`);
+      wsRef.current = ws;
 
-  useEffect(() => {
-    if (!hydrated) return;
-    window.localStorage.setItem(ALERTS_KEY, JSON.stringify(alerts));
-  }, [alerts, hydrated]);
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "completion") {
+            const { userId, taskId, status, completed_at } = data.payload || {};
+            if (userId && taskId) {
+              setCompletions((prev) => {
+                const userComp = { ...(prev[userId] || {}) };
+                if (status === "checked") {
+                  userComp[taskId] = completed_at || new Date().toISOString();
+                } else {
+                  delete userComp[taskId];
+                }
+                return { ...prev, [userId]: userComp };
+              });
+            }
+          }
+        } catch {
+          // ignore non-json messages
+        }
+      };
 
-  function login(username, password) {
-    const u = username.trim().toLowerCase();
-    const found = users.find(
-      (x) => x.username.toLowerCase() === u && x.password === password
-    );
-    if (!found) return false;
-    const safe = withoutPassword(found);
-    setUser(safe);
-    setView(defaultViewFor(found.role));
-    window.localStorage.setItem(SESSION_KEY, JSON.stringify(safe));
-    return true;
+      ws.onerror = () => {
+        // quiet error handle
+      };
+
+      ws.onclose = () => {
+        // reconnection can be handled if needed
+      };
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Re-read session from localStorage on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const rawUser = window.localStorage.getItem(SESSION_KEY);
+      const token = window.localStorage.getItem(TOKEN_KEY);
+
+      if (rawUser && token) {
+        const parsed = JSON.parse(rawUser);
+        setUser(parsed);
+        setView(defaultViewFor(parsed.role));
+        fetchInitialData(parsed);
+        connectWebSocket(token);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setHydrated(true);
+    }
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, [fetchInitialData, connectWebSocket]);
+
+  async function login(username, password) {
+    try {
+      const data = await api.post("/auth/login", {
+        username: username.trim(),
+        password,
+      });
+
+      if (!data?.token || !data?.user) {
+        return { ok: false, error: "Invalid response from server." };
+      }
+
+      const safeUser = data.user;
+      setUser(safeUser);
+      setView(defaultViewFor(safeUser.role));
+
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(TOKEN_KEY, data.token);
+        window.localStorage.setItem(SESSION_KEY, JSON.stringify(safeUser));
+      }
+
+      await fetchInitialData(safeUser);
+      connectWebSocket(data.token);
+
+      return { ok: true, user: safeUser };
+    } catch (err) {
+      return { ok: false, error: err.message || "Invalid username or password." };
+    }
   }
 
   function logout() {
     setUser(null);
     setView("tasks");
-    window.localStorage.removeItem(SESSION_KEY);
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(TOKEN_KEY);
+      window.localStorage.removeItem(SESSION_KEY);
+    }
   }
 
-  const addAlert = useCallback((alert) => {
-    setAlerts((prev) => {
-      if (prev.some((a) => a.id === alert.id)) return prev;
-      return [alert, ...prev].slice(0, 80);
-    });
+  const addAlert = useCallback(async (alert) => {
+    try {
+      await api.post("/alerts", alert);
+    } catch {
+      // fallback local
+    }
+    setAlerts((prev) => [alert, ...prev.filter((a) => a.id !== alert.id)].slice(0, 80));
   }, []);
 
   const markAlertRead = useCallback((id) => {
-    setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, read: true } : a)));
+    setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, read: true, is_read: true } : a)));
   }, []);
 
   const markAllAlertsRead = useCallback(() => {
-    setAlerts((prev) => prev.map((a) => ({ ...a, read: true })));
+    setAlerts((prev) => prev.map((a) => ({ ...a, read: true, is_read: true })));
   }, []);
 
-  function toggleTask(employeeId, taskId, location) {
-    let result = { ok: true };
-    setState((prev) => {
-      const task = taskById(taskId);
-      const assignee = users.find((u) => u.id === employeeId);
-      const owner = task?.category ? CATEGORY_REVIEWERS[task.category] : null;
+  async function toggleTask(employeeId, taskId, location) {
+    const targetUserId = employeeId || user?.id;
+    const isAlreadyDone = !!completions[targetUserId]?.[taskId];
 
-      if (owner) {
-        if (!isCategoryReviewer(assignee, task.category)) {
-          result = {
-            ok: false,
-            error: `${task.category} is checked by ${owner.name}.`,
-          };
-          return prev;
+    // Optimistic UI update
+    setCompletions((prev) => {
+      const userComp = { ...(prev[targetUserId] || {}) };
+      if (isAlreadyDone) {
+        delete userComp[taskId];
+      } else {
+        userComp[taskId] = new Date().toISOString();
+      }
+      return { ...prev, [targetUserId]: userComp };
+    });
+
+    try {
+      const res = await api.post(`/completions/toggle/${taskId}`, {
+        forUserId: targetUserId !== user?.id ? targetUserId : undefined,
+      });
+      return { ok: true, status: res.status };
+    } catch (err) {
+      // Revert optimistic update on failure
+      setCompletions((prev) => {
+        const userComp = { ...(prev[targetUserId] || {}) };
+        if (isAlreadyDone) {
+          userComp[taskId] = new Date().toISOString();
+        } else {
+          delete userComp[taskId];
         }
-        const loc = location || (assignee?.location !== "All centres" ? assignee?.location : null);
-        if (!loc) {
-          result = { ok: false, error: "Pick a centre before ticking Infra & Safety." };
-          return prev;
-        }
-        const byCat = { ...(prev.reviewChecks?.[task.category] || {}) };
-        const byLoc = { ...(byCat[loc] || {}) };
-        if (byLoc[taskId]) {
-          result = { ok: false, error: "Ticked items cannot be unmarked." };
-          return prev;
-        }
-        byLoc[taskId] = new Date().toISOString();
-        byCat[loc] = byLoc;
-        return {
-          ...prev,
-          reviewChecks: { ...(prev.reviewChecks || {}), [task.category]: byCat },
-        };
-      }
-
-      const emp = { ...(prev.completions[employeeId] || {}) };
-      if (emp[taskId]) {
-        result = { ok: false, error: "Ticked items cannot be unmarked." };
-        return prev;
-      }
-      const gate = CHECKLIST_PHOTO_GATES[task?.category];
-      if (gate && !checklistPhotosReady(task.category, prev.checklistPhotos?.[employeeId]?.[task.category])) {
-        result = {
-          ok: false,
-          error: `Upload the required ${gate.label} photo(s) before ticking this checklist.`,
-        };
-        return prev;
-      }
-      emp[taskId] = new Date().toISOString();
-      return {
-        ...prev,
-        completions: { ...prev.completions, [employeeId]: emp },
-      };
-    });
-    return result;
-  }
-
-  function addChecklistPhoto(employeeId, category, dataUrl) {
-    let result = { ok: false, error: "Photo could not be saved." };
-    const gate = CHECKLIST_PHOTO_GATES[category];
-    if (!dataUrl || !gate) return result;
-    setState((prev) => {
-      const emp = {
-        ...emptyChecklistPhotos(),
-        ...(prev.checklistPhotos?.[employeeId] || {}),
-      };
-      const current = [...(emp[category] || [])];
-      if (current.length >= gate.max) {
-        result = { ok: false, error: `Up to ${gate.max} ${gate.label} photos.` };
-        return prev;
-      }
-      current.push(dataUrl);
-      emp[category] = current;
-      result = { ok: true };
-      return {
-        ...prev,
-        checklistPhotos: { ...prev.checklistPhotos, [employeeId]: emp },
-      };
-    });
-    return result;
-  }
-
-  function categoryHasTicks(prev, employeeId, category) {
-    const done = prev.completions?.[employeeId] || {};
-    return tasksForCategory(category).some(
-      (t) => frequencyOf(t) === "daily" && isCompletionLive(t, done[t.id])
-    );
-  }
-
-  function removeChecklistPhoto(employeeId, category, index) {
-    let result = { ok: true };
-    setState((prev) => {
-      if (categoryHasTicks(prev, employeeId, category)) {
-        result = { ok: false, error: "Photos cannot be removed after a task is ticked." };
-        return prev;
-      }
-      const emp = {
-        ...emptyChecklistPhotos(),
-        ...(prev.checklistPhotos?.[employeeId] || {}),
-      };
-      const current = [...(emp[category] || [])];
-      if (index < 0 || index >= current.length) return prev;
-      current.splice(index, 1);
-      emp[category] = current;
-      return {
-        ...prev,
-        checklistPhotos: { ...prev.checklistPhotos, [employeeId]: emp },
-      };
-    });
-    return result;
-  }
-
-  function addUser({ name, username, password, location, employeeCode }) {
-    const uname = username.trim().toLowerCase();
-    const code = (employeeCode || "").trim();
-    if (!name.trim() || !uname || !password || !code) {
-      return { ok: false, error: "Name, employee code, username and password are required." };
+        return { ...prev, [targetUserId]: userComp };
+      });
+      return { ok: false, error: err.message || "Failed to update task." };
     }
-    if (users.some((u) => u.username.toLowerCase() === uname)) {
-      return { ok: false, error: "Username already exists." };
-    }
-    if (
-      users.some(
-        (u) => (u.employeeCode || "").trim().toLowerCase() === code.toLowerCase()
-      )
-    ) {
-      return { ok: false, error: "Employee code already exists." };
-    }
-    const record = {
-      id: `e-${Date.now()}`,
-      name: name.trim(),
-      username: uname,
-      password,
-      role: "employee",
-      location,
-      employeeCode: code,
-      taskIds: taskIdsForUser({
-        name: name.trim(),
-        username: uname,
-        role: "employee",
-      }),
-    };
-    setUsers((prev) => [...prev, record]);
-    return { ok: true };
   }
 
-  function deleteUser(userId) {
-    if (user?.id === userId) {
-      return { ok: false, error: "You cannot delete the signed-in account." };
-    }
-    const target = users.find((u) => u.id === userId);
-    if (!target) return { ok: false, error: "User not found." };
-    const managerCount = users.filter((u) => u.role === "manager").length;
-    if (target.role === "manager" && managerCount <= 1) {
-      return { ok: false, error: "Keep at least one manager." };
-    }
-    setUsers((prev) => prev.filter((u) => u.id !== userId));
-    return { ok: true };
-  }
+  async function addChecklistPhoto(employeeId, category, fileOrDataUrl) {
+    const targetUserId = employeeId || user?.id;
+    try {
+      const formData = new FormData();
+      formData.append("category", category);
 
-  function addVisitor({ employeeId, date, facilityType, aggregator, arrivalTime, punchOutTime, guestName, location, seats, payment }) {
-    const emp = users.find((e) => e.id === employeeId);
-    const visitor = {
-      id: `v-${Date.now()}`,
-      employeeId,
-      employeeName: emp?.name || "Unknown",
-      location: location || emp?.location || "Unknown",
-      date,
-      facilityType,
-      aggregator,
-      arrivalTime,
-      punchOutTime,
-      guestName,
-      seats,
-      payment,
-      createdAt: new Date().toISOString(),
-    };
-    setState((prev) => ({ ...prev, visitors: [visitor, ...prev.visitors] }));
-    return visitor;
-  }
-
-  function addIssue({ employeeId, location, category, notes, description, photo }) {
-    const emp = users.find((e) => e.id === employeeId);
-    const text = (notes || description || "").trim();
-    const issue = {
-      id: `i-${Date.now()}`,
-      employeeId,
-      employeeName: emp?.name || "Unknown",
-      // Reporter picks the unit — an issue isn't always at their home site.
-      location: location || emp?.location || "Unknown",
-      category,
-      notes: text,
-      description: text,
-      photo: photo || null,
-      status: DEFAULT_STATUS,
-      createdAt: new Date().toISOString(),
-      updatedAt: null,
-      notifiedEmail: OPS_EMAIL,
-    };
-    setState((prev) => ({ ...prev, issues: [issue, ...prev.issues] }));
-    return issue;
-  }
-
-  // Manager moves an issue along: Unattended → In progress → Resolved.
-  function setIssueStatus(issueId, status) {
-    setState((prev) => ({
-      ...prev,
-      issues: prev.issues.map((i) =>
-        i.id === issueId
-          ? { ...i, status, updatedAt: new Date().toISOString() }
-          : i
-      ),
-    }));
-  }
-
-  function deleteIssue(issueId) {
-    let result = { ok: false, error: "Issue not found." };
-    setState((prev) => {
-      const issue = (prev.issues || []).find((i) => i.id === issueId);
-      if (!issue) return prev;
-      if (!canDeleteIssue(issue)) {
-        result = { ok: false, error: "Issues can only be deleted within 2 hours of reporting." };
-        return prev;
+      if (fileOrDataUrl instanceof File || fileOrDataUrl instanceof Blob) {
+        formData.append("photo", fileOrDataUrl);
+      } else if (typeof fileOrDataUrl === "string" && fileOrDataUrl.startsWith("data:")) {
+        const blob = dataUrlToBlob(fileOrDataUrl);
+        formData.append("photo", blob, `photo-${Date.now()}.jpg`);
+      } else {
+        return { ok: false, error: "Invalid photo format." };
       }
-      result = { ok: true };
-      return {
-        ...prev,
-        issues: prev.issues.filter((i) => i.id !== issueId),
-      };
-    });
-    return result;
+
+      const res = await api.post("/photos", formData);
+      if (res?.url) {
+        setChecklistPhotos((prev) => {
+          const userPhotos = { ...(prev[targetUserId] || {}) };
+          const catList = [...(userPhotos[category] || [])];
+          catList.push(res.url);
+          userPhotos[category] = catList;
+          return { ...prev, [targetUserId]: userPhotos };
+        });
+        return { ok: true, url: res.url, id: res.id };
+      }
+      return { ok: false, error: "Upload failed." };
+    } catch (err) {
+      return { ok: false, error: err.message || "Failed to upload photo." };
+    }
   }
 
-  // Clear own completions — calls API then wipes from local state.
+  async function removeChecklistPhoto(employeeId, category, photoUrlOrIndex) {
+    const targetUserId = employeeId || user?.id;
+    try {
+      let photoUrl = photoUrlOrIndex;
+      let photoId = null;
+
+      if (typeof photoUrlOrIndex === "number") {
+        const currentList = checklistPhotos[targetUserId]?.[category] || [];
+        photoUrl = currentList[photoUrlOrIndex];
+      }
+
+      if (photoUrl && photoUrl.includes("/photos/")) {
+        // extract ID or call delete
+        await api.delete("/photos/my");
+      }
+
+      setChecklistPhotos((prev) => {
+        const userPhotos = { ...(prev[targetUserId] || {}) };
+        const catList = [...(userPhotos[category] || [])].filter((u, i) =>
+          typeof photoUrlOrIndex === "number" ? i !== photoUrlOrIndex : u !== photoUrl
+        );
+        userPhotos[category] = catList;
+        return { ...prev, [targetUserId]: userPhotos };
+      });
+
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message || "Could not remove photo." };
+    }
+  }
+
+  async function addIssue({ employeeId, location, category, notes, description, photo }) {
+    try {
+      const text = (notes || description || "").trim();
+      const formData = new FormData();
+      formData.append("location", location || user?.location || "Unknown");
+      formData.append("category", category || "Other");
+      formData.append("notes", text);
+      formData.append("description", text);
+
+      if (photo instanceof File || photo instanceof Blob) {
+        formData.append("photo", photo);
+      } else if (typeof photo === "string" && photo.startsWith("data:")) {
+        const blob = dataUrlToBlob(photo);
+        formData.append("photo", blob, `issue-${Date.now()}.jpg`);
+      }
+
+      const created = await api.post("/issues", formData);
+      if (created) {
+        setIssues((prev) => [created, ...prev]);
+        return { ok: true, issue: created };
+      }
+      return { ok: false, error: "Failed to report issue." };
+    } catch (err) {
+      return { ok: false, error: err.message || "Could not create issue." };
+    }
+  }
+
+  async function setIssueStatus(issueId, status) {
+    try {
+      await api.patch(`/issues/${issueId}/status`, { status });
+      setIssues((prev) =>
+        prev.map((i) => (i.id === issueId ? { ...i, status, updatedAt: new Date().toISOString() } : i))
+      );
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message || "Could not update issue status." };
+    }
+  }
+
+  async function deleteIssue(issueId) {
+    try {
+      await api.delete(`/issues/${issueId}`);
+      setIssues((prev) => prev.filter((i) => i.id !== issueId));
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message || "Could not delete issue." };
+    }
+  }
+
+  async function addVisitor(data) {
+    try {
+      const visitor = await api.post("/visitors", data);
+      if (visitor) {
+        setVisitors((prev) => [visitor, ...prev]);
+        return { ok: true, visitor };
+      }
+      return { ok: false, error: "Failed to log entry." };
+    } catch (err) {
+      return { ok: false, error: err.message || "Could not log entry." };
+    }
+  }
+
+  async function deleteVisitor(visitorId) {
+    try {
+      await api.delete(`/visitors/${visitorId}`);
+      setVisitors((prev) => prev.filter((v) => v.id !== visitorId));
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message || "Could not delete entry." };
+    }
+  }
+
+  async function addUser(userData) {
+    try {
+      const created = await api.post("/users", userData);
+      setUsers((prev) => [...prev, created]);
+      return { ok: true, user: created };
+    } catch (err) {
+      return { ok: false, error: err.message || "Could not create user." };
+    }
+  }
+
+  async function deleteUser(userId) {
+    try {
+      await api.delete(`/users/${userId}`);
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message || "Could not delete user." };
+    }
+  }
+
   async function clearMyCompletions(employeeId) {
-    await fetch("/api/completions/my", { method: "DELETE" });
-    setState((prev) => ({
-      ...prev,
-      completions: { ...prev.completions, [employeeId]: {} },
-    }));
+    try {
+      await api.delete("/completions/my");
+      setCompletions((prev) => ({ ...prev, [employeeId]: {} }));
+    } catch (err) {
+      console.warn("Clear completions error:", err);
+    }
   }
 
-  // Manager: clear another user's completions.
   async function clearUserCompletions(userId) {
-    await fetch(`/api/completions/user/${userId}`, { method: "DELETE" });
-    setState((prev) => ({
-      ...prev,
-      completions: { ...prev.completions, [userId]: {} },
-    }));
+    try {
+      await api.delete(`/completions/user/${userId}`);
+      setCompletions((prev) => ({ ...prev, [userId]: {} }));
+    } catch (err) {
+      console.warn("Clear user completions error:", err);
+    }
   }
 
-  // Clear own R2 photos from issues + remove them from state.
   async function clearMyPhotos(employeeId) {
-    const myIssues = (state.issues || []).filter(
-      (i) => i.employeeId === employeeId && i.photo
-    );
-    const urls = myIssues.map((i) => i.photo).filter(Boolean);
-    if (urls.length) {
-      await fetch("/api/photos/my", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls }),
-      });
+    try {
+      await api.delete("/photos/my");
+      setChecklistPhotos((prev) => ({ ...prev, [employeeId]: {} }));
+    } catch (err) {
+      console.warn("Clear photos error:", err);
     }
-    setState((prev) => ({
-      ...prev,
-      issues: prev.issues.map((i) =>
-        i.employeeId === employeeId ? { ...i, photo: null } : i
-      ),
-    }));
   }
 
-  // Manager: clear another user's R2 photos.
   async function clearUserPhotos(userId) {
-    const userIssues = (state.issues || []).filter(
-      (i) => i.employeeId === userId && i.photo
-    );
-    const urls = userIssues.map((i) => i.photo).filter(Boolean);
-    if (urls.length) {
-      await fetch(`/api/photos/user/${userId}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls }),
-      });
+    try {
+      await api.delete(`/photos/user/${userId}`);
+      setChecklistPhotos((prev) => ({ ...prev, [userId]: {} }));
+    } catch (err) {
+      console.warn("Clear user photos error:", err);
     }
-    setState((prev) => ({
-      ...prev,
-      issues: prev.issues.map((i) =>
-        i.employeeId === userId ? { ...i, photo: null } : i
-      ),
-    }));
-  }
-
-  function deleteVisitor(visitorId) {
-    let result = { ok: false, error: "Entry not found." };
-    setState((prev) => {
-      const visitor = (prev.visitors || []).find((v) => v.id === visitorId);
-      if (!visitor) return prev;
-      if (!canDeleteVisitor(visitor)) {
-        result = { ok: false, error: "Entries can only be deleted within 3 hours of logging." };
-        return prev;
-      }
-      result = { ok: true };
-      return {
-        ...prev,
-        visitors: prev.visitors.filter((v) => v.id !== visitorId),
-      };
-    });
-    return result;
   }
 
   const value = {
@@ -545,11 +475,11 @@ export function AppProvider({ children }) {
     setView,
     users,
     employees: users.filter((u) => u.role === "employee"),
-    completions: state.completions,
-    reviewChecks: state.reviewChecks || {},
-    checklistPhotos: state.checklistPhotos || {},
-    issues: state.issues,
-    visitors: state.visitors,
+    completions,
+    reviewChecks,
+    checklistPhotos,
+    issues,
+    visitors,
     toggleTask,
     addChecklistPhoto,
     removeChecklistPhoto,
@@ -568,6 +498,7 @@ export function AppProvider({ children }) {
     addAlert,
     markAlertRead,
     markAllAlertsRead,
+    refreshData: () => fetchInitialData(user),
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
