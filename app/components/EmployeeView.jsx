@@ -69,6 +69,15 @@ export default function EmployeeView() {
   const myIssues = issues.filter((i) => i.employeeId === currentEmployeeId);
   const myVisitors = visitors.filter((v) => v.employeeId === currentEmployeeId);
 
+  const totalVisible = grouped.reduce((acc, [, tasks]) => acc + tasks.length, 0);
+  const totalDone = grouped.reduce((acc, [cat, tasks]) => {
+    const done = CATEGORY_REVIEWERS[cat]
+      ? reviewDoneMap(reviewChecks, cat, activeLocation)
+      : siteDone;
+    return acc + tasks.filter((t) => done[t.id]).length;
+  }, 0);
+  const pct = totalVisible > 0 ? Math.round((totalDone / totalVisible) * 100) : 0;
+
   const visibleGroups = grouped.filter(([category, tasks]) => {
     const q = query.trim().toLowerCase();
     if (q && !category.toLowerCase().includes(q) && !tasks.some((t) => t.name.toLowerCase().includes(q))) {
@@ -87,14 +96,17 @@ export default function EmployeeView() {
     <section>
       {tab === "tasks" && (
         <>
-      <div className="page-head page-head-stack">
-        <div>
-          <h1>Tasks</h1>
-          <p className="muted">
-            {reviewer
-              ? `${reviewLocation} · Infra & Safety review`
-              : `${employee.location} · manage your assigned work`}
+      <div className={styles.summaryCard}>
+        <div className={styles.summaryText}>
+          <h1 className={styles.summaryHeading}>
+            {reviewer ? reviewLocation : (employee.location || "Tasks")}
+          </h1>
+          <p className={styles.summaryMeta}>
+            {totalDone} of {totalVisible} completed · {pct}% Done
           </p>
+        </div>
+        <div className={styles.ring} style={{"--pct": pct}}>
+          <span style={{color: pct === 100 ? "var(--ok)" : "var(--text)"}}>{pct}%</span>
         </div>
       </div>
       <label className="search-bar">
@@ -324,13 +336,7 @@ function CategoryAccordion({
       >
       <div className={styles.cardTop}>
         <span className={styles.title}>{category}</span>
-        <span className={`status-chip ${pct === 100 ? "chip-ok-tag" : "chip-pending-tag"}`}>
-          {pct === 100 ? "Complete" : "Pending"}
-        </span>
-      </div>
-      <div className={styles.cardMeta}>
-        <span className="muted small">{doneCount}/{tasks.length} tasks</span>
-        <span className={`muted small ${styles.details}`}>View details</span>
+        <span className={styles.catCount}>{doneCount}/{tasks.length}</span>
       </div>
       <div className="progress-track" aria-hidden="true">
         <span className="progress-fill" style={{ width: `${pct}%` }} />

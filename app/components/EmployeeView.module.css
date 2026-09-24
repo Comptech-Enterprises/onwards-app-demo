@@ -3,6 +3,34 @@
   padding: 16px;
 }
 
+.summaryCard {
+  composes: panel from "./glass.module.css";
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.summaryText {
+  flex: 1;
+  min-width: 0;
+}
+
+.summaryHeading {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.summaryMeta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .accordionCard {
   padding: 0;
   overflow: hidden;
@@ -35,16 +63,17 @@
   font-size: 16px;
 }
 
-.cardMeta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
 
 .details {
   color: var(--brand) !important;
   font-weight: 600;
+}
+
+.catCount {
+  color: var(--brand);
+  font-weight: 600;
+  font-size: 13px;
+  flex-shrink: 0;
 }
 
 .body {
