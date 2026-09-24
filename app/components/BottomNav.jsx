@@ -34,12 +34,31 @@ function Icon({ name }) {
       </svg>
     );
   }
+  if (name === "scores") {
+    return (
+      <svg viewBox="0 0 24 24">
+        <rect x="3" y="12" width="4" height="8" rx="1" />
+        <rect x="10" y="7" width="4" height="13" rx="1" />
+        <rect x="17" y="4" width="4" height="16" rx="1" />
+      </svg>
+    );
+  }
   if (name === "cm") {
     return (
       <svg viewBox="0 0 24 24">
         <circle cx="9" cy="8" r="3" />
         <circle cx="16" cy="9" r="2.4" />
         <path d="M4 19c1-3 3.2-4.5 5-4.5S13 16 14 19M14 19c.6-2 2-3.2 3.5-3.2S21 17.4 21.5 19" />
+      </svg>
+    );
+  }
+  if (name === "team") {
+    return (
+      <svg viewBox="0 0 24 24">
+        <circle cx="9" cy="7" r="3" />
+        <path d="M3 19c.8-2.8 3-4.5 6-4.5s5.2 1.7 6 4.5" />
+        <circle cx="17" cy="8" r="2.4" />
+        <path d="M17 13.5c1.5.3 2.7 1.2 3.5 3" />
       </svg>
     );
   }
@@ -67,19 +86,30 @@ export default function BottomNav() {
     user.role === "manager"
       ? [
           { id: "dashboard", label: "Home", icon: "home" },
+          { id: "scores", label: "Scores", icon: "scores" },
           { id: "issues", label: "Issues", icon: "issues" },
           { id: "visitors", label: "VAS", icon: "vas" },
           { id: "cm", label: "CM", icon: "cm" },
           { id: "alerts", label: "Alerts", icon: "alerts" },
           { id: "profile", label: "Profile", icon: "profile" },
         ]
-      : [
-          { id: "tasks", label: "Tasks", icon: "tasks" },
-          { id: "issues", label: "Issues", icon: "issues" },
-          { id: "visitors", label: "VAS", icon: "vas" },
-          { id: "alerts", label: "Alerts", icon: "alerts" },
-          { id: "profile", label: "Profile", icon: "profile" },
-        ];
+      : user.designation === "cm"
+        ? [
+            { id: "tasks", label: "Tasks", icon: "tasks" },
+            { id: "team", label: "Team", icon: "team" },
+            { id: "issues", label: "Issues", icon: "issues" },
+            { id: "visitors", label: "VAS", icon: "vas" },
+            { id: "alerts", label: "Alerts", icon: "alerts" },
+            { id: "profile", label: "Profile", icon: "profile" },
+          ]
+        : [
+            { id: "tasks", label: "Tasks", icon: "tasks" },
+            { id: "team", label: "Team", icon: "team" },
+            { id: "issues", label: "Issues", icon: "issues" },
+            { id: "visitors", label: "VAS", icon: "vas" },
+            { id: "alerts", label: "Alerts", icon: "alerts" },
+            { id: "profile", label: "Profile", icon: "profile" },
+          ];
 
   return (
     <nav className={styles.bar} aria-label="Main">

@@ -1,79 +1,84 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useApp } from "@/lib/store";
 import {
-  CATEGORY_REVIEWERS,
+  CATEGORIES,
   ISSUE_STATUSES,
   LOCATIONS,
-  REVIEW_CATEGORIES,
+  TASKS,
   canDeleteIssue,
   canDeleteVisitor,
-  isDedicatedReviewer,
+  computeCMScore,
+  computeCentreScore,
+  getCentreTeam,
   liveDoneMap,
-  reviewProgress,
-  taskById,
-  tasksForCategory,
+  taskIdsForUser,
   visibleTasks,
 } from "@/lib/seed";
 import { IssuePhoto } from "./PhotoLightbox";
-import StatusBadge from "./StatusBadge";
 import CmView from "./CmView";
 import styles from "./ManagerView.module.css";
 
 export default function ManagerView() {
-  const { completions, reviewChecks, checklistPhotos, issues, visitors, employees, view: tab } = useApp();
+  const { user, completions, checklistPhotos, issues, visitors, employees, view: tab, setIssueStatus } = useApp();
   const [unit, setUnit] = useState("all");
   const [openId, setOpenId] = useState(null);
 
-  const rows = useMemo(() => {
-    return employees.map((e) => {
-      const done = liveDoneMap(completions[e.id] || {});
-      let total;
-      let completed;
-      if (isDedicatedReviewer(e)) {
-        const cats = REVIEW_CATEGORIES.filter((c) => CATEGORY_REVIEWERS[c] && (
-          (e.username || "").toLowerCase() === CATEGORY_REVIEWERS[c].username.toLowerCase()
-          || (e.name || "").toLowerCase() === CATEGORY_REVIEWERS[c].name.toLowerCase()
-        ));
-        total = 0;
-        completed = 0;
-        for (const loc of LOCATIONS) {
-          for (const cat of cats) {
-            const p = reviewProgress(reviewChecks, cat, loc);
-            total += p.total;
-            completed += p.completed;
-          }
-        }
-      } else {
-        const due = visibleTasks(
-          (e.taskIds || []).map(taskById).filter(Boolean),
-          done
-        );
-        total = due.length;
-        completed = due.filter((t) => done[t.id]).length;
-      }
-      const pct = total ? Math.round((completed / total) * 100) : 0;
-      return { ...e, total, completed, pct, done, photos: checklistPhotos[e.id] || {}, reviewChecks };
+  const myCMs = useMemo(() => employees.filter((e) => e.managerId === user?.id), [employees, user?.id]);
+  const hasCMs = myCMs.length > 0;
+  const cmIds = useMemo(() => new Set(myCMs.map((e) => e.id)), [myCMs]);
+
+  const nonOverseers = useMemo(() => {
+    return employees.filter((e) => {
+      if (e.location === "All centres") return false;
+      if (!hasCMs) return true;
+      return cmIds.has(e.id) || cmIds.has(e.supervisorId);
     });
-  }, [completions, reviewChecks, checklistPhotos, employees]);
+  }, [employees, hasCMs, cmIds]);
+
+  const myLocations = useMemo(() => [...new Set(nonOverseers.map((e) => e.location))], [nonOverseers]);
+
+  const rows = useMemo(() => {
+    return nonOverseers.map((e) => {
+      if (e.designation === "cm") {
+        const cmScore = computeCMScore(e, employees, completions);
+        const groupLocations = cmScore.groups.map((g) => g.location);
+        const locLabel = groupLocations.length > 1
+          ? groupLocations.map((l) => l.split(",")[0]).join(" & ")
+          : (e.location || "All centres");
+        return {
+          ...e, total: cmScore.totalTasks, completed: cmScore.uniqueDoneCount,
+          pct: cmScore.scorePct, cmScore,
+          managedLocations: groupLocations,
+          locationDisplay: locLabel,
+        };
+      }
+      const team = getCentreTeam(e, employees);
+      const centreScore = computeCentreScore(team, completions);
+      return {
+        ...e, total: centreScore.totalTasks, completed: centreScore.uniqueDoneCount,
+        pct: centreScore.scorePct,
+        managedLocations: [e.location].filter((l) => l && l !== "All centres"),
+        locationDisplay: e.location,
+      };
+    });
+  }, [nonOverseers, employees, completions]);
 
   const totals = useMemo(() => {
     const total = rows.reduce((a, r) => a + r.total, 0);
     const completed = rows.reduce((a, r) => a + r.completed, 0);
     const pct = total ? Math.round((completed / total) * 100) : 0;
-    const fullyDone = rows.filter((r) => r.pct === 100).length;
-    return { total, completed, pct, fullyDone };
+    const onTrack = rows.filter((r) => r.pct >= 80).length;
+    return { total, completed, pct, onTrack };
   }, [rows]);
 
-  const centreCount = LOCATIONS.length;
+  const locs = hasCMs ? myLocations : LOCATIONS;
 
-  // The task-detail table can be narrowed to a single unit.
   const detailRows = useMemo(
-    () =>
-      unit === "all"
-        ? rows
-        : rows.filter((r) => r.location === unit || isDedicatedReviewer(r)),
+    () => unit === "all" ? rows : rows.filter((r) =>
+      (r.managedLocations || [r.location]).includes(unit)
+    ),
     [rows, unit]
   );
 
@@ -81,400 +86,173 @@ export default function ManagerView() {
 
   return (
     <section>
-      <div className="page-head page-head-stack">
-        <div>
-          <h1>
-            {tab === "issues"
-              ? "Issues"
-              : tab === "visitors"
-                ? "VAS"
-                : tab === "cm"
-                  ? "CM"
-                  : "Home"}
-          </h1>
-          <p className="muted">
-            {tab === "dashboard"
-              ? `Live view across all ${centreCount} centres`
-              : "Manage centres and staff"}
-          </p>
-        </div>
-      </div>
-
       {tab === "cm" ? (
         <CmView />
       ) : tab === "visitors" ? (
-        <VisitorsTab visitors={visitors} />
+        <VASTab visitors={visitors} />
       ) : tab === "issues" ? (
-        <IssuesTab issues={issues} />
+        <IssuesTab issues={issues} setIssueStatus={setIssueStatus} />
+      ) : tab === "scores" ? (
+        <ScoresTab rows={rows} />
       ) : (
-        <>
-      {/* Stat tiles */}
-      <div className={styles.statGrid}>
-        <StatTile label="Overall completion" value={`${totals.pct}%`} accent />
-        <StatTile
-          label="Tasks done"
-          value={`${totals.completed}/${totals.total}`}
+        <HomeTab
+          totals={totals}
+          rows={rows}
+          detailRows={detailRows}
+          unit={unit}
+          setUnit={setUnit}
+          setOpenId={setOpenId}
+          locs={locs}
+          hasCMs={hasCMs}
         />
-        <StatTile
-          label="Employees on track"
-          value={`${totals.fullyDone}/${rows.length}`}
-        />
-        <StatTile
-          label="Tasks pending"
-          value={totals.total - totals.completed}
-          warn={totals.total - totals.completed > 0}
-        />
-      </div>
-
-      {/* All-employee task detail */}
-      <div className={styles.card}>
-        <div className="card-title">
-          All employees — task detail
-          <label className="unit-filter">
-            <span className="muted small">Centre</span>
-            <select value={unit} onChange={(e) => setUnit(e.target.value)}>
-              <option value="all">All centres</option>
-              {LOCATIONS.map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        {/* Name + unit only; green once every task is ticked. Tap for detail. */}
-        <div className={styles.peopleGrid}>
-          {detailRows.map((r) => (
-            <button
-              key={r.id}
-              type="button"
-              className={`${styles.person} ${r.pct === 100 ? styles.complete : ""}`}
-              onClick={() => setOpenId(r.id)}
-            >
-              <span className={styles.personName}>{r.name}</span>
-              <span className={styles.personUnit}>{r.location}{r.employeeCode ? ` · ${r.employeeCode}` : ""}</span>
-              <div className="progress-track" aria-hidden="true">
-                <span className="progress-fill" style={{ width: `${r.pct}%` }} />
-              </div>
-              <span className="muted small">{r.completed}/{r.total} · {r.pct}%</span>
-            </button>
-          ))}
-        </div>
-      </div>
-        </>
       )}
-
-      {openRow && (
-        <PersonModal row={openRow} onClose={() => setOpenId(null)} />
-      )}
+      {openRow && <PersonModal row={openRow} onClose={() => setOpenId(null)} />}
     </section>
   );
 }
 
-// Every issue across the units, filterable and grouped by location.
-function IssuesTab({ issues: allIssues }) {
-  const [unit, setUnit] = useState("all");
-  const [status, setStatus] = useState("all");
-
-  const counts = useMemo(() => {
-    const c = {};
-    ISSUE_STATUSES.forEach((s) => (c[s] = 0));
-    allIssues.forEach((i) => (c[i.status] = (c[i.status] || 0) + 1));
-    return c;
-  }, [allIssues]);
-
-  const issues = useMemo(
-    () =>
-      status === "all" ? allIssues : allIssues.filter((i) => i.status === status),
-    [allIssues, status]
-  );
-
-  const units = useMemo(() => {
-    const seen = new Set(issues.map((i) => i.location));
-    // Keep the configured order, then anything unexpected that turns up.
-    return [
-      ...LOCATIONS.filter((l) => seen.has(l)),
-      ...[...seen].filter((l) => !LOCATIONS.includes(l)),
-    ];
-  }, [issues]);
-
-  const visible = useMemo(
-    () => (unit === "all" ? units : units.filter((l) => l === unit)),
-    [units, unit]
-  );
-
+function HomeTab({ totals, rows, detailRows, unit, setUnit, setOpenId, locs, hasCMs }) {
   return (
-    <div className={styles.card}>
-      <div className="card-title">
-        Reported issues today
-        <span className="pill">{allIssues.length}</span>
-        <label className="unit-filter">
-          <span className="muted small">Centre</span>
-          <select value={unit} onChange={(e) => setUnit(e.target.value)}>
-            <option value="all">All centres</option>
-            {LOCATIONS.map((l) => (
-              <option key={l} value={l}>
-                {l}
-              </option>
-            ))}
-          </select>
-        </label>
+    <>
+      <div className={styles.statRow}>
+        <StatTile label="COMPLETION" value={`${totals.pct}%`} />
+        <StatTile label="DONE" value={`${totals.completed}/${totals.total}`} />
+        <StatTile label="ON TRACK" value={`${totals.onTrack}/${rows.length}`} ok />
       </div>
 
-      {/* Status filter — doubles as an at-a-glance count per status. */}
-      <div className="status-filter" role="group" aria-label="Filter by status">
+      {!hasCMs && <div className={styles.chipScroll}>
         <button
-          className={`status-chip ${status === "all" ? "active" : ""}`}
-          onClick={() => setStatus("all")}
-        >
-          All <span className="status-count">{allIssues.length}</span>
-        </button>
-        {ISSUE_STATUSES.map((s) => (
+          type="button"
+          className={`${styles.locChip} ${unit === "all" ? styles.chipActive : ""}`}
+          onClick={() => setUnit("all")}
+        >All</button>
+        {locs.map((l) => (
           <button
-            key={s}
-            className={`status-chip status-${slug(s)} ${
-              status === s ? "active" : ""
-            }`}
-            onClick={() => setStatus(s)}
-          >
-            {s} <span className="status-count">{counts[s]}</span>
+            key={l}
+            type="button"
+            className={`${styles.locChip} ${unit === l ? styles.chipActive : ""}`}
+            onClick={() => setUnit(l)}
+          >{l}</button>
+        ))}
+      </div>}
+
+      <h2 className={styles.sectionHead}>Employee Progress</h2>
+      <div className="stack">
+        {detailRows.map((r) => (
+          <button key={r.id} type="button" className={styles.empCard} onClick={() => setOpenId(r.id)}>
+            <div className={styles.empTop}>
+              <div className={styles.empInfo}>
+                <div className={styles.empNameRow}>
+                  <span className={styles.empName}>{r.name}</span>
+                  {r.designation === "cm" && <span className={styles.cmBadge}>CM</span>}
+                </div>
+                <span className="muted small">{r.locationDisplay || r.location}</span>
+              </div>
+              <div className={styles.ring} style={{ "--pct": r.pct }}>
+                <span style={{ color: r.pct === 100 ? "var(--ok)" : "var(--text)" }}>{r.pct}%</span>
+              </div>
+            </div>
+            <div className="progress-track" style={{ marginTop: 10 }}>
+              <span className="progress-fill" style={{ width: `${r.pct}%` }} />
+            </div>
+            <span className="muted small" style={{ marginTop: 4, display: "block" }}>{r.completed}/{r.total} tasks</span>
           </button>
         ))}
       </div>
-
-      {visible.length === 0 ? (
-        <p className="muted empty">
-          {allIssues.length === 0
-            ? "No issues reported yet."
-            : `No ${status === "all" ? "" : `${status.toLowerCase()} `}issues${
-                unit === "all" ? "" : ` at ${unit}`
-              }.`}
-        </p>
-      ) : (
-        visible.map((loc) => {
-          const forUnit = issues.filter((i) => i.location === loc);
-          return (
-            <div key={loc} className="issue-group">
-              <div className="issue-group-head">
-                <strong>{loc}</strong>
-                <span className="muted small">
-                  {forUnit.length} {forUnit.length === 1 ? "issue" : "issues"}
-                </span>
-              </div>
-              <ul className="issue-list">
-                {forUnit.map((i) => (
-                  <IssueItem key={i.id} issue={i} />
-                ))}
-              </ul>
-            </div>
-          );
-        })
-      )}
-    </div>
+    </>
   );
 }
 
-function IssueItem({ issue: i }) {
+function IssuesTab({ issues: allIssues, setIssueStatus }) {
   const { deleteIssue } = useApp();
+  const [unit, setUnit] = useState("all");
+  const [status, setStatus] = useState("all");
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    let list = allIssues;
+    if (status !== "all") list = list.filter((i) => i.status === status);
+    if (unit !== "all") list = list.filter((i) => i.location === unit);
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter((i) =>
+        (i.notes || i.description || "").toLowerCase().includes(q) ||
+        (i.employeeName || "").toLowerCase().includes(q) ||
+        (i.category || "").toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [allIssues, status, unit, search]);
+
   return (
-    <li className={`issue-item issue-${slug(i.status)}`}>
-      <div className="issue-top">
-        <span className="muted small">{i.location}</span>
-        <span className={`tag tag-${slug(i.category)}`}>{i.category}</span>
-        <StatusBadge status={i.status} />
-        <span className="muted small right">
-          {new Date(i.createdAt).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </span>
+    <>
+      <h1 className={styles.pageHeading}>All Issues</h1>
+      <label className="search-bar">
+        <span aria-hidden="true">⌕</span>
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search issues…" />
+      </label>
+      <div className="chip-row">
+        <button type="button" className={`chip-filter ${status === "all" ? "active" : ""}`} onClick={() => setStatus("all")}>All</button>
+        {ISSUE_STATUSES.map((s) => (
+          <button key={s} type="button" className={`chip-filter ${status === s ? "active" : ""}`} onClick={() => setStatus(s)}>{s}</button>
+        ))}
       </div>
-      <p className="issue-desc">{i.notes || i.description}</p>
-      {i.photo && (
-        <IssuePhoto
-          src={i.photo}
-          caption={`${i.category} · ${i.location} — reported by ${i.employeeName}`}
-        />
+      <div className={styles.chipScroll} style={{ marginBottom: 16 }}>
+        <button type="button" className={`${styles.locChip} ${unit === "all" ? styles.chipActive : ""}`} onClick={() => setUnit("all")}>All</button>
+        {LOCATIONS.map((l) => (
+          <button key={l} type="button" className={`${styles.locChip} ${unit === l ? styles.chipActive : ""}`} onClick={() => setUnit(l)}>{l}</button>
+        ))}
+      </div>
+
+      {filtered.length === 0 ? (
+        <p className="muted empty">No issues match filters.</p>
+      ) : (
+        <div className="stack">
+          {filtered.map((i) => (
+            <IssueCard key={i.id} issue={i} onStatusChange={setIssueStatus} onDelete={deleteIssue} />
+          ))}
+        </div>
       )}
-      <div className="issue-foot">
-        <span className="muted small">
-          reported by {i.employeeName}
-          {i.updatedAt && ` · updated ${timeOf(i.updatedAt)}`}
-        </span>
-        {canDeleteIssue(i) && (
-          <button
-            type="button"
-            className="btn-delete"
-            onClick={() => {
-              if (!window.confirm("Delete this issue?")) return;
-              const result = deleteIssue(i.id);
-              if (!result.ok) window.alert(result.error);
-            }}
-          >
-            Delete
-          </button>
-        )}
-      </div>
-    </li>
+    </>
   );
 }
 
-function PersonModal({ row, onClose }) {
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [onClose]);
-
-  const visible = visibleTasks((row.taskIds || []).map(taskById).filter(Boolean), row.done);
-  const doneTasks = visible.filter((t) => row.done[t.id]).map((t) => t.id);
-  const pendingTasks = visible.filter((t) => !row.done[t.id]).map((t) => t.id);
-  const reviewer = isDedicatedReviewer(row);
-  const siteLocation = row.location !== "All centres" ? row.location : null;
+function IssueCard({ issue: i, onStatusChange, onDelete }) {
+  const timeStr = new Date(i.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+  const borderLeft = i.status === "In progress" ? "3px solid #2f6df4" : i.status === "Resolved" ? "3px solid var(--ok)" : undefined;
 
   return (
-    <div className="modal-wrap" role="dialog" aria-modal="true" aria-label={`${row.name} task detail`}>
-      <div className="modal-backdrop" onClick={onClose} aria-hidden="true" />
-      <div className="modal">
-        <div className="modal-head">
-          <div>
-            <strong className="modal-title">{row.name}</strong>
-            <span className="muted small">{row.location}{row.employeeCode ? ` · ${row.employeeCode}` : ""}</span>
-          </div>
-          <button className="modal-close" onClick={onClose} aria-label="Close">
-            ✕
-          </button>
-        </div>
-
-        <div className="modal-body">
-          <div className="modal-row">
-            <span className="drawer-label">Progress</span>
-            <span className={`chip ${row.pct === 100 ? "chip-ok" : ""}`}>
-              {row.completed}/{row.total} · {row.pct}%
-            </span>
-          </div>
-
-          {reviewer ? (
-            REVIEW_CATEGORIES.map((category) => (
-              <div key={category} className="modal-section">
-                <span className="drawer-label">{category} · reviewed by {row.name}</span>
-                {LOCATIONS.map((loc) => {
-                  const p = reviewProgress(row.reviewChecks, category, loc);
-                  const pending = tasksForCategory(category).filter((t) => !p.done[t.id]);
-                  return (
-                    <div key={loc} className="review-centre-block">
-                      <div className="modal-row">
-                        <span>{loc}</span>
-                        <span className={`chip ${p.completed === p.total ? "chip-ok" : ""}`}>
-                          {p.completed}/{p.total}
-                        </span>
-                      </div>
-                      {pending.length > 0 && (
-                        <div className="mini-list">
-                          {pending.map((t) => (
-                            <span key={t.id} className="mini pending-mini">
-                              {t.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ))
-          ) : (
-            <>
-          <PhotoReview label="Washroom photos" photos={row.photos?.Washroom} captionPrefix={`${row.location} · washroom`} />
-          <PhotoReview label="Pantry photos" photos={row.photos?.Pantry} captionPrefix={`${row.location} · pantry`} />
-          <PhotoReview label="Common area photos" photos={row.photos?.["Common Areas"]} captionPrefix={`${row.location} · common area`} />
-          <PhotoReview label="Soft services staff photo" photos={row.photos?.["Soft Services"]} captionPrefix={`${row.location} · soft services staff`} />
-
-          <div className="modal-section">
-            <span className="drawer-label">Done</span>
-            {doneTasks.length === 0 ? (
-              <p className="muted empty">Nothing ticked off yet.</p>
-            ) : (
-              <div className="mini-list">
-                {doneTasks.map((id) => {
-                  const task = taskById(id);
-                  if (!task) return null;
-                  return (
-                  <span key={id} className="mini done-mini">
-                    {task.name}
-                    <em className="done-time">{timeOf(row.done[id])}</em>
-                  </span>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <div className="modal-section">
-            <span className="drawer-label">Pending</span>
-            {pendingTasks.length === 0 ? (
-              <p className="muted empty">All tasks complete.</p>
-            ) : (
-              <div className="mini-list">
-                {pendingTasks.map((id) => {
-                  const task = taskById(id);
-                  if (!task) return null;
-                  return (
-                  <span key={id} className="mini pending-mini">
-                    {task.name}
-                  </span>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {siteLocation && REVIEW_CATEGORIES.map((category) => {
-            const owner = CATEGORY_REVIEWERS[category];
-            const p = reviewProgress(row.reviewChecks, category, siteLocation);
-            const pending = tasksForCategory(category).filter((t) => !p.done[t.id]);
-            return (
-              <div key={category} className="modal-section">
-                <span className="drawer-label">{category}</span>
-                <p className="muted small review-note">
-                  {p.completed === p.total
-                    ? `Checked by ${owner.name}`
-                    : `Pending — this checklist is reviewed by ${owner.name}`}
-                </p>
-                <div className="modal-row">
-                  <span className="muted small">{siteLocation}</span>
-                  <span className={`chip ${p.completed === p.total ? "chip-ok" : ""}`}>
-                    {p.completed}/{p.total}
-                  </span>
-                </div>
-                {pending.length > 0 && (
-                  <div className="mini-list">
-                    {pending.map((t) => (
-                      <span key={t.id} className="mini pending-mini">
-                        {t.name}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-            </>
-          )}
+    <div className={styles.issueCard} style={borderLeft ? { borderLeft } : undefined}>
+      <div className={styles.issueTop}>
+        <span className={`tag tag-${slug(i.category)}`}>{i.category}</span>
+        <span className={`status-badge status-${slug(i.status)}`}>{i.status}</span>
+      </div>
+      <p className={styles.issueDesc}>{i.notes || i.description}</p>
+      {i.photo && <IssuePhoto src={i.photo} caption={`${i.category} · ${i.location}`} />}
+      <div className={styles.issueFoot}>
+        <span className="muted small">{i.employeeName} · {i.location} · {timeStr}</span>
+        <div className={styles.statusBtns}>
+          {[["Unattended", "New"], ["In progress", "WIP"], ["Resolved", "Done"]].map(([val, label]) => (
+            <button
+              key={val}
+              type="button"
+              className={`${styles.statusBtn} ${i.status === val ? styles.statusBtnActive : ""}`}
+              onClick={() => onStatusChange(i.id, val)}
+            >{label}</button>
+          ))}
         </div>
       </div>
+      {canDeleteIssue(i) && (
+        <button type="button" className="btn-delete" style={{ marginTop: 8 }}
+          onClick={() => { if (!window.confirm("Delete this issue?")) return; const r = onDelete(i.id); if (!r.ok) window.alert(r.error); }}>
+          Delete
+        </button>
+      )}
     </div>
   );
 }
 
-function VisitorsTab({ visitors: allVisitors }) {
+function VASTab({ visitors: allVisitors }) {
   const { deleteVisitor } = useApp();
   const [unit, setUnit] = useState("all");
 
@@ -483,104 +261,275 @@ function VisitorsTab({ visitors: allVisitors }) {
     [allVisitors, unit]
   );
 
-  const totalPaid = visible.reduce((sum, v) => sum + (parseFloat(v.amountPaid) || 0), 0);
-
   return (
-    <div className={styles.card}>
-      <div className="card-title">
-        Value Added Services today
-        <span className="pill">{allVisitors.length}</span>
-        <label className="unit-filter">
-          <span className="muted small">Centre</span>
-          <select value={unit} onChange={(e) => setUnit(e.target.value)}>
-            <option value="all">All centres</option>
-            {LOCATIONS.map((l) => (
-              <option key={l} value={l}>{l}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <div className={styles.statGrid} style={{ marginBottom: "12px" }}>
-        <div className={`${styles.tile} ${styles.accent}`}>
-          <div className={styles.value}>{visible.length}</div>
-          <div className={styles.label}>Total entries{unit !== "all" ? ` · ${unit}` : ""}</div>
-        </div>
-        <div className={styles.tile}>
-          <div className={styles.value}>₹{totalPaid.toLocaleString()}</div>
-          <div className={styles.label}>Amount collected</div>
-        </div>
+    <>
+      <h1 className={styles.pageHeading}>All Visitors</h1>
+      <div className={styles.chipScroll} style={{ marginBottom: 16 }}>
+        <button type="button" className={`${styles.locChip} ${unit === "all" ? styles.chipActive : ""}`} onClick={() => setUnit("all")}>All</button>
+        {LOCATIONS.map((l) => (
+          <button key={l} type="button" className={`${styles.locChip} ${unit === l ? styles.chipActive : ""}`} onClick={() => setUnit(l)}>{l}</button>
+        ))}
       </div>
 
       {visible.length === 0 ? (
         <p className="muted empty">No entries logged{unit !== "all" ? ` at ${unit}` : ""} yet.</p>
       ) : (
-        <ul className="issue-list">
+        <div className="stack">
           {visible.map((v) => (
-            <li key={v.id} className="issue-item">
-              <div className="issue-top">
-                <span className="muted small">{v.location}</span>
-                {v.facilityType && <span className={`tag tag-common-areas`}>{v.facilityType}</span>}
-                <span className="muted small right">{v.date}</span>
+            <div key={v.id} className={styles.visitorCard}>
+              <div className={styles.visitorTop}>
+                <div>
+                  <span className={styles.visitorName}>{v.guestName}</span>
+                  {v.facilityType && (
+                    <span style={{ color: "var(--brand)", fontSize: 13, fontWeight: 600, display: "block", marginTop: 1 }}>
+                      {v.facilityType}{v.seats ? ` · ${v.seats} seat${v.seats > 1 ? "s" : ""}` : ""}
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                  <span className="muted small">{v.arrivalTime || v.date}</span>
+                  {v.invoiceTechMonk != null && (
+                    <span style={{ background: v.invoiceTechMonk === "Yes" ? "color-mix(in srgb, var(--ok) 15%, transparent)" : "#fff3cd", color: v.invoiceTechMonk === "Yes" ? "var(--ok)" : "#9a6700", fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 6 }}>
+                      TM Invoice: {v.invoiceTechMonk}
+                    </span>
+                  )}
+                </div>
               </div>
-              <p className="issue-desc">
-                <strong>{v.guestName}</strong>{v.aggregator ? ` · ${v.aggregator}` : ""}
-              </p>
-              <div className="issue-foot">
+              <div className={styles.visitorMeta} style={{ marginTop: 6 }}>
                 <span className="muted small">
-                  {v.arrivalTime && `In: ${v.arrivalTime}`}{v.punchOutTime && ` · Out: ${v.punchOutTime}`}{v.seats && ` · ${v.seats} seat${v.seats > 1 ? "s" : ""}`}{" · logged by "}{v.employeeName}
+                  📍 {v.source === "Direct" ? "Direct" : (v.aggregatorName || v.aggregator || "Aggregator")} · {v.payment || "Cash"}
                 </span>
-                {v.payment && <span className="chip chip-ok">₹{v.payment}</span>}
-                {canDeleteVisitor(v) && (
-                  <button
-                    type="button"
-                    className="btn-delete"
-                    onClick={() => {
-                      if (!window.confirm("Delete this entry?")) return;
-                      const result = deleteVisitor(v.id);
-                      if (!result.ok) window.alert(result.error);
-                    }}
-                  >
-                    Delete
-                  </button>
-                )}
               </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function PhotoReview({ label, photos, captionPrefix }) {
-  const list = photos || [];
-  return (
-    <div className="modal-section">
-      <span className="drawer-label">{label}</span>
-      {list.length === 0 ? (
-        <p className="muted empty">No photos uploaded.</p>
-      ) : (
-        <div className={styles.photoGrid}>
-          {list.map((src, i) => (
-            <IssuePhoto key={`${captionPrefix}-${i}`} src={src} caption={`${captionPrefix} ${i + 1}`} />
+              {(v.amountReceived != null || v.paymentAmount != null) && (
+                <div style={{ marginTop: 2 }}>
+                  <span style={{ color: "var(--ok)", fontWeight: 700, fontSize: 13 }}>
+                    💰 Amount (excl. GST): ₹{v.amountReceived ?? v.paymentAmount ?? 0}
+                  </span>
+                </div>
+              )}
+              <span className="muted small" style={{ marginTop: 4, display: "block" }}>Logged by {v.employeeName} · {v.location}</span>
+              {canDeleteVisitor(v) && (
+                <button type="button" className="btn-delete" style={{ marginTop: 8 }}
+                  onClick={() => { if (!window.confirm("Delete this entry?")) return; const r = deleteVisitor(v.id); if (!r.ok) window.alert(r.error); }}>
+                  Delete
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }
 
-function StatTile({ label, value, accent, warn }) {
+function ScoresTab({ rows }) {
+  const { employees, completions } = useApp();
+  const [search, setSearch] = useState("");
+  const [expandedCM, setExpandedCM] = useState(null);
+
+  const cmRows = rows.filter((r) => r.designation === "cm");
+  const avgScore = cmRows.length ? Math.round(cmRows.reduce((a, r) => a + r.pct, 0) / cmRows.length) : 0;
+  const totalCentres = cmRows.reduce((a, r) => a + (r.cmScore?.groups?.length || 1), 0);
+  const onTrack = cmRows.filter((r) => r.pct >= 80).length;
+
+  const visible = search.trim()
+    ? cmRows.filter((r) => r.name.toLowerCase().includes(search.toLowerCase()) || (r.locationDisplay || r.location || "").toLowerCase().includes(search.toLowerCase()))
+    : cmRows;
+
   return (
-    <div className={`${styles.tile} ${accent ? styles.accent : ""} ${warn ? styles.warn : ""}`}>
-      <div className={styles.value}>{value}</div>
-      <div className={styles.label}>{label}</div>
+    <>
+      <h1 className={styles.pageHeading}>CM Scores</h1>
+      <p className="muted" style={{ marginBottom: 14, marginTop: -10 }}>Cluster manager scoring overview</p>
+      <div className={styles.statRow}>
+        <StatTile label="AVG SCORE" value={`${avgScore}%`} />
+        <StatTile label="CENTRES" value={totalCentres} />
+        <StatTile label="ON TRACK" value={`${onTrack}/${cmRows.length}`} ok />
+      </div>
+      <label className="search-bar" style={{ marginBottom: 16 }}>
+        <span aria-hidden="true">⌕</span>
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search CM or centre name…" />
+      </label>
+      <div className="stack">
+        {visible.map((r) => {
+          const cmScore = r.cmScore || computeCMScore(r, employees, completions);
+          const expanded = expandedCM === r.id;
+          return (
+            <div key={r.id} className={styles.empCard} style={{ cursor: "pointer" }} onClick={() => setExpandedCM(expanded ? null : r.id)}>
+              <div className={styles.empTop}>
+                <div className={styles.empInfo}>
+                  <div className={styles.empNameRow}>
+                    <span className={styles.empName}>{r.name}</span>
+                    <span className={styles.cmBadge}>CM</span>
+                  </div>
+                  <span className="muted small" style={{ color: "var(--brand)", fontWeight: 600 }}>📍 {r.locationDisplay || r.location}</span>
+                </div>
+                <div className={styles.ring} style={{ "--pct": r.pct }}>
+                  <span style={{ color: r.pct === 100 ? "var(--ok)" : "var(--text)" }}>{r.pct}%</span>
+                </div>
+              </div>
+              <div className="progress-track" style={{ marginTop: 10 }}>
+                <span className="progress-fill" style={{ width: `${r.pct}%` }} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                <span className="muted small">{r.completed}/{r.total} tasks completed</span>
+                <span style={{ color: r.pct === 100 ? "var(--ok)" : "var(--brand)", fontWeight: 700, fontSize: 12 }}>
+                  Score: {r.pct}%
+                </span>
+              </div>
+
+              {expanded && cmScore.groups && (
+                <div style={{ marginTop: 12, borderTop: "1px solid var(--glass-border)", paddingTop: 10 }}>
+                  {cmScore.groups.map((g) => (
+                    <div key={g.location} style={{ marginBottom: 10 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                        <span style={{ fontWeight: 700, fontSize: 13 }}>{g.location.split(",")[0]}</span>
+                        <span style={{ color: "var(--brand)", fontWeight: 700, fontSize: 12 }}>{g.stats.scorePct}%</span>
+                      </div>
+                      <div className="progress-track" style={{ marginBottom: 6 }}>
+                        <span className="progress-fill" style={{ width: `${g.stats.scorePct}%` }} />
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {g.stats.individualStats.filter((s) => s.emp.id !== r.id).map((s) => (
+                          <span key={s.emp.id} style={{
+                            background: "color-mix(in srgb, var(--brand) 10%, transparent)",
+                            color: "var(--brand)", fontSize: 11, padding: "2px 8px",
+                            borderRadius: 6, fontWeight: 600,
+                          }}>
+                            {s.emp.name.split(" ")[0]} {s.pct}%
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+function PersonModal({ row, onClose }) {
+  const { employees, completions, checklistPhotos } = useApp();
+  const isCM = row.designation === "cm";
+  const cmStats = useMemo(
+    () => isCM ? (row.cmScore || computeCMScore(row, employees, completions)) : null,
+    [isCM, row, employees, completions]
+  );
+  const [selectedGroupIdx, setSelectedGroupIdx] = useState(0);
+
+  const currentGroup = (isCM && cmStats?.groups?.length > 0) ? cmStats.groups[selectedGroupIdx] : null;
+  const targetLocation = currentGroup ? currentGroup.location : row.location;
+
+  const centreTeam = useMemo(() => {
+    if (currentGroup) return currentGroup.employees;
+    return getCentreTeam(row, employees, targetLocation);
+  }, [currentGroup, row, employees, targetLocation]);
+
+  const centreScore = useMemo(() => {
+    if (currentGroup) return currentGroup.stats;
+    return computeCentreScore(centreTeam, completions);
+  }, [currentGroup, centreTeam, completions]);
+
+  const done = centreScore.uniqueDoneMap;
+
+  const allAssignedTaskIds = useMemo(() => {
+    const ids = new Set();
+    centreTeam.forEach((m) => taskIdsForUser(m).forEach((id) => ids.add(id)));
+    if (ids.size === 0) (row.taskIds || []).forEach((id) => ids.add(id));
+    return ids;
+  }, [centreTeam, row.taskIds]);
+
+  const myTasks = TASKS.filter((t) => allAssignedTaskIds.has(t.id));
+  const categories = CATEGORIES.filter((c) => myTasks.some((t) => t.category === c));
+
+  return (
+    <div className="modal-wrap" role="dialog" aria-modal="true" aria-label={`${row.name} task detail`}
+      onKeyDown={(e) => e.key === "Escape" && onClose()}>
+      <div className="modal-backdrop" onClick={onClose} aria-hidden="true" />
+      <div className="modal">
+        <div className="modal-head">
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <strong className="modal-title">{row.name}</strong>
+              {isCM && <span className={styles.cmBadge}>CM</span>}
+            </div>
+            <span style={{ color: "var(--brand)", fontSize: 13, fontWeight: 600 }}>
+              📍 {targetLocation}
+            </span>
+            {isCM && cmStats ? (
+              <span className="muted small" style={{ display: "block", marginTop: 2 }}>
+                {cmStats.groups.length > 1
+                  ? `Group: ${currentGroup ? currentGroup.stats.scorePct : 0}% · Overall: ${cmStats.scorePct}% (${cmStats.uniqueDoneCount}/${cmStats.totalTasks} tasks)`
+                  : `Overall: ${cmStats.scorePct}% (${cmStats.uniqueDoneCount}/${cmStats.totalTasks} tasks)`}
+              </span>
+            ) : (
+              <span className="muted small" style={{ display: "block", marginTop: 2 }}>
+                Centre Score: {centreScore.scorePct}% ({centreScore.uniqueDoneCount}/{centreScore.totalTasks} tasks)
+              </span>
+            )}
+          </div>
+          <button className="modal-close" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+
+        {isCM && cmStats && cmStats.groups.length > 1 && (
+          <div className={styles.chipScroll} style={{ marginBottom: 14 }}>
+            {cmStats.groups.map((g, i) => (
+              <button
+                key={g.location}
+                type="button"
+                className={`${styles.locChip} ${selectedGroupIdx === i ? styles.chipActive : ""}`}
+                onClick={() => setSelectedGroupIdx(i)}
+                style={{ fontSize: 12 }}
+              >
+                {g.location.split(",")[0]}<br />
+                <span style={{ fontSize: 11, opacity: 0.85 }}>{g.stats.scorePct}% ({g.stats.uniqueDoneCount}/{g.stats.totalTasks})</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {categories.map((cat) => {
+          const catTasks = visibleTasks(myTasks.filter((t) => t.category === cat), done);
+          const catDone = catTasks.filter((t) => done[t.id]).length;
+          const catTotal = catTasks.length;
+          const catPct = catTotal ? Math.round((catDone / catTotal) * 100) : 0;
+          const pending = catTasks.filter((t) => !done[t.id]);
+          return (
+            <div key={cat} className={styles.catBlock}>
+              <div className={styles.catBlockTop}>
+                <span className={styles.catBlockName}>{cat}</span>
+                <span style={{ color: "var(--brand)", fontWeight: 700, fontSize: 13 }}>{catDone}/{catTotal}</span>
+              </div>
+              <div className="progress-track" style={{ marginTop: 6 }}>
+                <span className="progress-fill" style={{ width: `${catPct}%` }} />
+              </div>
+              {pending.length > 0 && (
+                <div className={styles.pendingList}>
+                  {pending.map((t) => (
+                    <span key={t.id} className={styles.pendingChip}>{t.name}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
-// completions[employeeId][taskId] holds the ISO time the box was ticked.
+function StatTile({ label, value, ok }) {
+  return (
+    <div className={styles.tile}>
+      <div className={`${styles.tileLabel}`}>{label}</div>
+      <div className={`${styles.tileValue} ${ok ? styles.tileOk : ""}`}>{value}</div>
+    </div>
+  );
+}
+
 function timeOf(iso) {
   if (!iso) return "";
   const d = new Date(iso);

@@ -9,6 +9,7 @@ import TaskReminder from "./components/TaskReminder";
 import BottomNav from "./components/BottomNav";
 import AlertsView from "./components/AlertsView";
 import ProfileView from "./components/ProfileView";
+import TeamView from "./components/TeamView";
 
 export default function Home() {
   const { user, hydrated, view } = useApp();
@@ -28,6 +29,7 @@ export default function Home() {
   let body;
   if (view === "profile") body = <ProfileView />;
   else if (view === "alerts") body = <AlertsView />;
+  else if (view === "team") body = <TeamView />;
   else if (user.role === "manager") body = <ManagerView />;
   else body = <EmployeeView />;
 

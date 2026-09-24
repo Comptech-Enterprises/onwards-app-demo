@@ -3,94 +3,260 @@
   padding: 16px;
 }
 
-.statGrid {
+/* 3-tile stat row */
+.statRow {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
   margin-bottom: 16px;
 }
 
 .tile {
   composes: panel from "./glass.module.css";
-  padding: 16px;
-}
-
-.tile.accent {
-  background: linear-gradient(135deg, var(--brand), var(--brand-ink));
-  border-color: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-.tile.accent .value,
-.tile.accent .label {
-  color: #fff;
-}
-
-.tile.warn {
-  border-color: color-mix(in srgb, var(--warn) 45%, var(--glass-border));
-}
-
-.value {
-  font-size: 26px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.label {
-  color: var(--muted);
-  font-size: 12px;
-  margin-top: 6px;
-}
-
-.peopleGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 10px;
-}
-
-.person {
-  composes: row from "./glass.module.css";
+  padding: 14px 12px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
-  padding: 14px;
-  border-radius: 16px;
+  gap: 4px;
+}
+
+.tileLabel {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tileValue {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
   color: var(--text);
+}
+
+.tileOk {
+  color: var(--ok);
+}
+
+/* Scrollable horizontal chip filter */
+.chipScroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 16px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.chipScroll::-webkit-scrollbar { display: none; }
+
+.locChip {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1.5px solid var(--glass-border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.14s ease;
+  white-space: nowrap;
+}
+
+.chipActive {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+/* Section heading */
+.sectionHead {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 12px;
+  color: var(--text);
+}
+
+/* Employee progress card */
+.empCard {
+  composes: panel from "./glass.module.css";
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  border-radius: 18px;
+  width: 100%;
   text-align: left;
   cursor: pointer;
-  transition: transform 0.12s ease, border-color 0.12s ease;
-  width: 100%;
+  transition: transform 0.12s ease;
+  color: inherit;
 }
-
-.person:hover {
+.empCard:hover {
   transform: translateY(-1px);
-  border-color: var(--muted);
 }
 
-.person.complete {
-  background: var(--ok-soft);
-  border-color: var(--ok);
+.empTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 }
 
-.person.complete .personName {
-  color: var(--ok);
+.empInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.personName {
+.empNameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.empName {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 15px;
+  color: var(--text);
 }
 
-.personUnit {
+.cmBadge {
+  background: color-mix(in srgb, var(--brand) 18%, transparent);
+  color: var(--brand);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+
+/* Ring sized to ~48px (smaller than employee view's 68px) */
+.ring {
+  --pct: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  background: conic-gradient(
+    var(--brand) calc(var(--pct) * 1%),
+    var(--border) 0
+  );
+}
+
+.ring span {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+/* Page headings for sub-tabs */
+.pageHeading {
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0 0 14px;
+  color: var(--text);
+}
+
+/* Issue card */
+.issueCard {
+  composes: panel from "./glass.module.css";
+  padding: 14px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.issueTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.issueDesc {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.issueFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.statusBtns {
+  display: flex;
+  gap: 4px;
+}
+
+.statusBtn {
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1.5px solid var(--glass-border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.statusBtnActive {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+/* Visitor card */
+.visitorCard {
+  composes: panel from "./glass.module.css";
+  padding: 14px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.visitorTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.visitorName {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.visitorType {
+  display: block;
   font-size: 12px;
   color: var(--muted);
+  margin-top: 1px;
 }
 
-.person.complete .personUnit {
-  color: var(--ok);
-  opacity: 0.8;
+.visitorMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .photoGrid {
@@ -99,20 +265,40 @@
   gap: 8px;
 }
 
-@media (max-width: 860px) {
-  .statGrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+/* PersonModal category block */
+.catBlock {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+.catBlock:last-child {
+  border-bottom: none;
 }
 
-@media (max-width: 640px) {
-  .managerTabs {
-    display: none;
-  }
+.catBlockTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
 }
 
-@media (max-width: 560px) {
-  .peopleGrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.catBlockName {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.pendingList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.pendingChip {
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+  color: var(--brand);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  line-height: 1.4;
 }
