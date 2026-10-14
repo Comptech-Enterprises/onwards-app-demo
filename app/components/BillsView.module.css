@@ -1,0 +1,290 @@
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.title {
+  font-size: 20px;
+  font-weight: 700;
+}
+.addBtn {
+  background: var(--brand);
+  color: #fff;
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.addBtn:hover {
+  background: var(--brand-ink);
+}
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.chipScroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  scrollbar-width: none;
+}
+.chipScroll::-webkit-scrollbar {
+  display: none;
+}
+.chipScroll > button {
+  flex-shrink: 0;
+}
+.dateRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.dateRow input[type="date"] {
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  padding: 7px 10px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.summary {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  margin: 4px 4px 10px;
+}
+.card {
+  composes: panel from "./glass.module.css";
+  padding: 14px;
+}
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+.emp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+  color: var(--brand);
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.empName {
+  font-size: 14px;
+  font-weight: 700;
+}
+.tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+.tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--muted);
+}
+.tagBrand {
+  composes: tag;
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+  color: var(--brand);
+}
+.item {
+  font-size: 15px;
+  font-weight: 700;
+}
+.remark {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 3px;
+}
+.amount {
+  color: var(--brand);
+  font-size: 14px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+.when {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 10px;
+}
+.viewBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  color: var(--brand);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.viewBtn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.thumbs {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 0 8px;
+  margin-bottom: 8px;
+}
+.thumb {
+  position: relative;
+  width: 82px;
+  height: 104px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  background: var(--surface);
+}
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.thumbBadge {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  border-radius: 4px;
+  padding: 2px 0;
+}
+.thumbDel {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(226, 90, 61, 0.92);
+  color: #fff;
+  font-size: 11px;
+  cursor: pointer;
+}
+.pickRow {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.pickBtn {
+  flex: 1;
+  border: 1px dashed var(--border);
+  background: var(--glass-strong);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 14px 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tip {
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+  margin-bottom: 10px;
+}
+.error {
+  color: var(--warn);
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+.fixed {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .addBtn {
+    text-align: center;
+  }
+  .title {
+    font-size: 18px;
+  }
+  .cardTop {
+    flex-direction: column;
+    gap: 4px;
+  }
+  .when {
+    align-self: flex-end;
+  }
+  .foot {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .viewBtn {
+    justify-content: center;
+  }
+  .pickRow {
+    flex-direction: column;
+  }
+  .thumb {
+    width: 68px;
+    height: 86px;
+  }
+}

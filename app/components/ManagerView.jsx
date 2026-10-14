@@ -76,9 +76,9 @@ export default function ManagerView() {
   const locs = hasCMs ? myLocations : LOCATIONS;
 
   const detailRows = useMemo(
-    () => unit === "all" ? rows : rows.filter((r) =>
+    () => (unit === "all" ? rows : rows.filter((r) =>
       (r.managedLocations || [r.location]).includes(unit)
-    ),
+    )).slice().sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })),
     [rows, unit]
   );
 
@@ -327,7 +327,8 @@ function ScoresTab({ rows }) {
   const [search, setSearch] = useState("");
   const [expandedCM, setExpandedCM] = useState(null);
 
-  const cmRows = rows.filter((r) => r.designation === "cm");
+  const cmRows = rows.filter((r) => r.designation === "cm")
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
   const avgScore = cmRows.length ? Math.round(cmRows.reduce((a, r) => a + r.pct, 0) / cmRows.length) : 0;
   const totalCentres = cmRows.reduce((a, r) => a + (r.cmScore?.groups?.length || 1), 0);
   const onTrack = cmRows.filter((r) => r.pct >= 80).length;

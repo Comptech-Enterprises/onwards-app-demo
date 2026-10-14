@@ -51,6 +51,7 @@ export function AppProvider({ children }) {
   const [issues, setIssues] = useState([]);
   const [visitors, setVisitors] = useState([]);
   const [alerts, setAlerts] = useState([]);
+  const [bills, setBills] = useState([]);
   const [hydrated, setHydrated] = useState(false);
   const [view, setView] = useState("tasks");
   const wsRef = useRef(null);
@@ -66,6 +67,7 @@ export function AppProvider({ children }) {
         api.get("/issues").catch(() => []),
         api.get("/visitors").catch(() => []),
         api.get("/alerts").catch(() => []),
+        api.get(currentUser.role === "manager" ? "/bills/manager" : "/bills").catch(() => []),
         isManager ? api.get("/completions/all").catch(() => ({})) : api.get("/completions/my").catch(() => ({})),
         isManager ? api.get("/photos/all").catch(() => ({})) : api.get("/photos/my").catch(() => ({})),
       ];
@@ -75,11 +77,13 @@ export function AppProvider({ children }) {
       }
 
       const results = await Promise.all(promises);
-      const [tasksRes, issuesRes, visitorsRes, alertsRes, compRes, photosRes, usersRes] = results;
+      const [tasksRes, issuesRes, visitorsRes, alertsRes, billsRes, compRes, photosRes, usersRes] = results;
 
       if (Array.isArray(issuesRes)) setIssues(issuesRes);
       if (Array.isArray(visitorsRes)) setVisitors(visitorsRes);
       if (Array.isArray(alertsRes)) setAlerts(alertsRes);
+      if (Array.isArray(billsRes)) setBills(billsRes);
+      else if (Array.isArray(billsRes?.bills)) setBills(billsRes.bills);
 
       if (usersRes && Array.isArray(usersRes)) {
         setUsers(usersRes.map((u) => ({ ...u, taskIds: u.taskIds || taskIdsForUser(u) })));
@@ -122,6 +126,13 @@ export function AppProvider({ children }) {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          if (data.event === "bill_created" && data.data?.id) {
+            setBills((prev) => (prev.some((b) => b.id === data.data.id) ? prev : [data.data, ...prev]));
+          } else if (data.event === "bill_updated" && data.data?.id) {
+            setBills((prev) => prev.map((b) => (b.id === data.data.id ? { ...b, ...data.data } : b)));
+          } else if (data.event === "bill_deleted" && data.data?.id) {
+            setBills((prev) => prev.filter((b) => b.id !== data.data.id));
+          }
           if (data.type === "completion") {
             const { userId, taskId, status, completed_at } = data.payload || {};
             if (userId && taskId) {
@@ -410,6 +421,37 @@ export function AppProvider({ children }) {
     }
   }
 
+  async function addBill({ itemName, remark, amount, files, location }) {
+    try {
+      const formData = new FormData();
+      formData.append("item_name", (itemName || "").trim());
+      if (remark) formData.append("remark", remark.trim());
+      if (amount !== undefined && amount !== null && amount !== "") formData.append("amount", String(amount));
+      if (location) formData.append("location", location);
+      (files || []).forEach((f) => formData.append("bills", f, f.name));
+
+      const res = await api.post("/bills", formData);
+      const created = res?.bill || res;
+      if (created?.id) {
+        setBills((prev) => (prev.some((b) => b.id === created.id) ? prev : [created, ...prev]));
+        return { ok: true, bill: created };
+      }
+      return { ok: false, error: "Failed to submit bill." };
+    } catch (err) {
+      return { ok: false, error: err.message || "Failed to submit bill." };
+    }
+  }
+
+  async function deleteBill(billId) {
+    try {
+      await api.delete(`/bills/${billId}`);
+      setBills((prev) => prev.filter((b) => b.id !== billId));
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.message || "Could not delete bill." };
+    }
+  }
+
   async function addUser(userData) {
     try {
       const created = await api.post("/users", userData);
@@ -480,6 +522,9 @@ export function AppProvider({ children }) {
     checklistPhotos,
     issues,
     visitors,
+    bills,
+    addBill,
+    deleteBill,
     toggleTask,
     addChecklistPhoto,
     removeChecklistPhoto,

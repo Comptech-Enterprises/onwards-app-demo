@@ -27,6 +27,14 @@ function Icon({ name }) {
       </svg>
     );
   }
+  if (name === "bills") {
+    return (
+      <svg viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+      </svg>
+    );
+  }
   if (name === "vas") {
     return (
       <svg viewBox="0 0 24 24">
@@ -88,6 +96,7 @@ export default function BottomNav() {
           { id: "dashboard", label: "Home", icon: "home" },
           { id: "scores", label: "Scores", icon: "scores" },
           { id: "issues", label: "Issues", icon: "issues" },
+          { id: "bills", label: "Bills", icon: "bills" },
           { id: "visitors", label: "VAS", icon: "vas" },
           { id: "cm", label: "CM", icon: "cm" },
           { id: "alerts", label: "Alerts", icon: "alerts" },
@@ -98,7 +107,8 @@ export default function BottomNav() {
             { id: "tasks", label: "Tasks", icon: "tasks" },
             { id: "team", label: "Team", icon: "team" },
             { id: "issues", label: "Issues", icon: "issues" },
-            { id: "visitors", label: "VAS", icon: "vas" },
+            { id: "bills", label: "Bills", icon: "bills" },
+          { id: "visitors", label: "VAS", icon: "vas" },
             { id: "alerts", label: "Alerts", icon: "alerts" },
             { id: "profile", label: "Profile", icon: "profile" },
           ]
@@ -106,7 +116,8 @@ export default function BottomNav() {
             { id: "tasks", label: "Tasks", icon: "tasks" },
             { id: "team", label: "Team", icon: "team" },
             { id: "issues", label: "Issues", icon: "issues" },
-            { id: "visitors", label: "VAS", icon: "vas" },
+            { id: "bills", label: "Bills", icon: "bills" },
+          { id: "visitors", label: "VAS", icon: "vas" },
             { id: "alerts", label: "Alerts", icon: "alerts" },
             { id: "profile", label: "Profile", icon: "profile" },
           ];
