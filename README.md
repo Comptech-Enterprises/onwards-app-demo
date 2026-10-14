@@ -1,6 +1,8 @@
-# Onward Workspaces — Daily Task Management & Issue Reporting
+# Onward Workspaces — Daily Operations & Task Management
 
-A responsive **Next.js 14** web app that replaces spreadsheet-based daily operations for Onward Workspaces. Employees mark off their assigned tasks and report issues from their phone; a manager sees live completion stats and reported issues across all locations from a single dashboard.
+A responsive **Next.js 14** web app for Onward Workspaces daily operations. Employees complete tasks, report issues, log visitors, and submit purchase bills from their phone; managers get a live dashboard with completion stats, issue tracking, billing oversight, and CM scoring across all centres.
+
+Connected to a **live backend** with real-time WebSocket sync, JWT auth, and Cloudflare R2 photo storage.
 
 Built by **Comptech Enterprises**.
 
@@ -8,18 +10,27 @@ Built by **Comptech Enterprises**.
 
 ## Features
 
-- **Role-based login** — manager accounts + individual employee accounts (hardcoded credentials for this prototype).
-- **Employee view**
-  - **Tasks tab** — only your own tasks for the day, grouped by category, tap to complete (records the time), with a live completion ring.
-  - **Issues tab** — report an issue with category, description, and an optional photo; simulates an email to central operations, then lists your reported issues.
-- **Manager dashboard**
-  - Stat tiles: overall completion %, tasks done, employees on track, open issues.
-  - Completion **per employee** with progress bars and percentages.
-  - **Issues panel inline** in the dashboard (location, description, reporter, time, photo).
-  - All-employees table showing each person's done vs. pending tasks (collapses to cards on mobile).
-- **Daily auto-reset** — both task completions and issues clear on a new calendar day.
-- **localStorage persistence** — all state is stored client-side; no backend required.
-- Fully responsive, light/dark aware.
+### Employee View
+- **Tasks** — daily checklist grouped by category, tap to complete with timestamp and live completion ring.
+- **Team** — view team members and their progress at your centre.
+- **Issues** — report issues with category, description, and optional photo; email sent to central ops.
+- **Bills & Purchases** — submit purchase bills with item name, remark, amount, and multi-page receipt photos.
+- **VAS (Visitor & Service)** — log visitor entries with details.
+- **Alerts** — real-time notifications for task updates and issues.
+
+### Manager Dashboard
+- **Home** — stat tiles (completion %, tasks done, on-track count), per-employee progress bars sorted A–Z.
+- **Scores** — CM scoring overview with cluster manager hierarchy.
+- **Issues** — all issues across centres with status filters (Unattended / In progress / Resolved), location chips, and search.
+- **Bills & Purchases** — review bills submitted across all centres with location filter, date range filter (Today / This week / This month / Last month / Custom), search, receipt viewer with multi-page navigation, and delete capability.
+- **VAS** — visitor logs across centres.
+- **CM** — centre manager view with team breakdowns.
+
+### Shared
+- **Role-based routing** — manager, CM, and employee views with appropriate permissions.
+- **Real-time sync** — WebSocket connection for live task completions and bill updates.
+- **Responsive design** — works on phone, tablet, and desktop with glassmorphic UI.
+- **Photo lightbox** — full-screen image viewer with multi-page navigation (← →).
 
 ---
 
@@ -32,7 +43,14 @@ npm run dev
 
 Open http://localhost:3000.
 
-### Other scripts
+### Environment variables
+
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_API_URL` | Backend API base URL (default: `https://app.onwardworkspaces.com/api`) |
+| `NEXT_PUBLIC_WS_URL` | WebSocket URL (default: `wss://app.onwardworkspaces.com/ws`) |
+
+### Scripts
 
 | Command | Description |
 |---------|-------------|
@@ -42,57 +60,42 @@ Open http://localhost:3000.
 
 ---
 
-## Login credentials
-
-| Role | Name | Username | Password | Centre |
-|------|------|----------|----------|--------|
-| **Manager** | Ops Manager | `manager` | `Manager@123` | All centres |
-| **Manager** | Mannat Jain | `mannat` | `Mannat@123` | All centres |
-| **Manager** | Anil Purdhani | `anil` | `Anil@123` | All centres |
-| Employee | Anubhav | `anubhav` | `Anubhav@123` | Okhla Phase 2 |
-| Employee | Arpit Tanwar | `arpit` | `Arpit@123` | Okhla Phase 3 |
-| Employee | Amit | `amit` | `Amit@123` | Okhla Phase 3 |
-| Employee | Mukund | `mukund` | `Mukund@123` | Okhla Phase 3 |
-| Employee | Kamal Khanna | `kamal` | `Kamal@123` | Noida Sector 126 |
-| Employee | Abhishek Dalal | `abhishek` | `Abhishek@123` | Udyog Vihar Phase 4 |
-| Employee | Sourabh | `sourabh` | `Sourabh@123` | Udyog Vihar Phase 4 |
-| Employee | Sameer | `sameer` | `Sameer@123` | Emaar Capital |
-| Employee | Harish | `harish` | `Harish@123` | 151, Okhla Phase 3 |
-| Employee | Akansha | `akansha` | `Akansha@123` | ECE House, Connaught Place |
-| Employee | Sameer | `sameer.ece` | `Sameer@123` | ECE House, Connaught Place |
-
-Mohan Cooperative is in the centre list with no staff login yet.
-
----
-
 ## Project structure
 
 ```
 app/
-  layout.js              # wraps the app in AppProvider
-  page.js                # login gating + role-based routing
-  globals.css            # responsive design system (light/dark)
+  layout.js                # wraps the app in AppProvider
+  page.js                  # login gating + role-based view routing
+  globals.css              # responsive design system (light/dark, glassmorphic)
   components/
-    Login.jsx            # login screen
-    Header.jsx           # signed-in user + logout
-    EmployeeView.jsx     # Tasks / Issues tabs
-    IssueForm.jsx        # report issue with optional photo
-    ManagerView.jsx      # dashboard: stats, per-employee bars, issues
+    Login.jsx              # login screen
+    Header.jsx             # logo, date/time, user greeting
+    BottomNav.jsx           # bottom navigation with role-based tabs
+    EmployeeView.jsx       # Tasks / Issues / VAS tabs
+    ManagerView.jsx        # dashboard: stats, employee progress, issues, VAS
+    BillsView.jsx          # Bills & Purchases: list, filters, add modal, receipt viewer
+    CmView.jsx             # CM scoring and team breakdown
+    TeamView.jsx           # team member progress view
+    AlertsView.jsx         # notifications list
+    ProfileView.jsx        # user profile
+    IssueForm.jsx          # report issue with optional photo
+    VisitorForm.jsx        # log visitor entry
+    PhotoLightbox.jsx      # single + multi-image lightbox viewer
+    TaskReminder.jsx       # pending task reminder banner
 lib/
-  credentials.json       # single source of truth for users/logins
-  seed.js                # centres, tasks, assignments, auth helper
-  store.jsx              # React context + localStorage + daily reset
+  api.js                   # API client with JWT auth
+  credentials.json         # user seed data
+  seed.js                  # centres, tasks, assignments, categories
+  store.jsx                # React context, API integration, WebSocket sync
 ```
-
-## Configuration
-
-Edit `lib/credentials.json` to change users, passwords, centres, and per-employee task assignments. Task catalogue and categories live in `lib/seed.js`. Centres live in `LOCATIONS` in `lib/seed.js`.
 
 ---
 
-## Notes / limitations
+## Configuration
 
-This is a **prototype**. Passwords are hardcoded and bundled into the client, and all data lives in the browser's `localStorage`. For production you'd want server-side authentication (hashed passwords + an API route), a database, and real transactional email (e.g. Resend/Nodemailer) for issue notifications. The daily reset is triggered on load when the calendar day changes, not by a fixed-time scheduled job.
+- **Users & credentials**: `lib/credentials.json`
+- **Task catalogue & categories**: `lib/seed.js`
+- **Centres / locations**: `LOCATIONS` in `lib/seed.js`
 
 ---
 
