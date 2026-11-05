@@ -104,6 +104,8 @@ export default function ManagerView() {
           setOpenId={setOpenId}
           locs={locs}
           hasCMs={hasCMs}
+          employees={employees}
+          completions={completions}
         />
       )}
       {openRow && <PersonModal row={openRow} onClose={() => setOpenId(null)} />}
@@ -111,7 +113,72 @@ export default function ManagerView() {
   );
 }
 
-function HomeTab({ totals, rows, detailRows, unit, setUnit, setOpenId, locs, hasCMs }) {
+function ProgressCard({ r, onClick, children }) {
+  return (
+    <button type="button" className={styles.empCard} onClick={onClick}>
+      <div className={styles.empTop}>
+        <div className={styles.empInfo}>
+          <div className={styles.empNameRow}>
+            <span className={styles.empName}>{r.name}</span>
+            {r.designation === "cm" && <span className={styles.cmBadge}>CM</span>}
+          </div>
+          <span className="muted small" style={{ color: "var(--brand)", fontWeight: 600 }}>
+            📍 {r.locationDisplay || r.location}
+          </span>
+        </div>
+        <div className={styles.ring} style={{ "--pct": r.pct }}>
+          <span style={{ color: r.pct === 100 ? "var(--ok)" : "var(--text)" }}>{r.pct}%</span>
+        </div>
+      </div>
+      <div className="progress-track" style={{ marginTop: 10 }}>
+        <span className="progress-fill" style={{ width: `${r.pct}%` }} />
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+        <span className="muted small">{r.completed}/{r.total} tasks</span>
+        <span style={{ color: r.pct >= 80 ? "var(--ok)" : "var(--brand)", fontWeight: 700, fontSize: 12 }}>
+          Score: {r.pct}%
+        </span>
+      </div>
+      {children}
+    </button>
+  );
+}
+
+function HomeTab({ totals, rows, detailRows, unit, setUnit, setOpenId, locs, hasCMs, employees, completions }) {
+  const [cmModalId, setCmModalId] = useState(null);
+
+  // Build CM-to-children mapping
+  const cmIdSet = useMemo(() => new Set(detailRows.filter((r) => r.designation === "cm").map((r) => r.id)), [detailRows]);
+
+  const childrenByCM = useMemo(() => {
+    const map = {};
+    detailRows.forEach((r) => {
+      if (r.designation !== "cm" && cmIdSet.has(r.supervisorId)) {
+        if (!map[r.supervisorId]) map[r.supervisorId] = [];
+        const own = computeCentreScore([r], completions);
+        map[r.supervisorId].push({
+          ...r,
+          total: own.totalTasks,
+          completed: own.uniqueDoneCount,
+          pct: own.scorePct,
+        });
+      }
+    });
+    Object.values(map).forEach((list) =>
+      list.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+    );
+    return map;
+  }, [detailRows, cmIdSet, completions]);
+
+  // Top-level: CMs + employees not under any CM
+  const topLevel = useMemo(
+    () => detailRows.filter((r) => r.designation === "cm" || !cmIdSet.has(r.supervisorId)),
+    [detailRows, cmIdSet]
+  );
+
+  const cmModalRow = cmModalId ? topLevel.find((r) => r.id === cmModalId) : null;
+  const cmModalChildren = cmModalRow ? childrenByCM[cmModalRow.id] || [] : [];
+
   return (
     <>
       <div className={styles.statRow}>
@@ -138,27 +205,77 @@ function HomeTab({ totals, rows, detailRows, unit, setUnit, setOpenId, locs, has
 
       <h2 className={styles.sectionHead}>Employee Progress</h2>
       <div className="stack">
-        {detailRows.map((r) => (
-          <button key={r.id} type="button" className={styles.empCard} onClick={() => setOpenId(r.id)}>
-            <div className={styles.empTop}>
-              <div className={styles.empInfo}>
-                <div className={styles.empNameRow}>
-                  <span className={styles.empName}>{r.name}</span>
-                  {r.designation === "cm" && <span className={styles.cmBadge}>CM</span>}
+        {topLevel.map((r) => {
+          const children = childrenByCM[r.id] || [];
+          const isCMWithChildren = r.designation === "cm" && children.length > 0;
+
+          return (
+            <ProgressCard
+              key={r.id}
+              r={r}
+              onClick={() => {
+                if (isCMWithChildren) {
+                  setCmModalId(r.id);
+                } else {
+                  setOpenId(r.id);
+                }
+              }}
+            >
+              {r.designation === "cm" && r.cmScore?.groups?.length > 1 && (
+                <div className={styles.subChips}>
+                  {r.cmScore.groups.map((g) => (
+                    <span key={g.location} className={styles.subChip}>
+                      {g.location.split(",")[0]}: <strong>{g.stats.scorePct}%</strong>
+                    </span>
+                  ))}
                 </div>
-                <span className="muted small">{r.locationDisplay || r.location}</span>
-              </div>
-              <div className={styles.ring} style={{ "--pct": r.pct }}>
-                <span style={{ color: r.pct === 100 ? "var(--ok)" : "var(--text)" }}>{r.pct}%</span>
-              </div>
-            </div>
-            <div className="progress-track" style={{ marginTop: 10 }}>
-              <span className="progress-fill" style={{ width: `${r.pct}%` }} />
-            </div>
-            <span className="muted small" style={{ marginTop: 4, display: "block" }}>{r.completed}/{r.total} tasks</span>
-          </button>
-        ))}
+              )}
+              {isCMWithChildren && (
+                <span className="muted small" style={{ marginTop: 6, display: "block" }}>
+                  {children.length} supervisor{children.length !== 1 ? "s" : ""} on ground · tap to view
+                </span>
+              )}
+            </ProgressCard>
+          );
+        })}
       </div>
+
+      {/* CM team modal */}
+      {cmModalRow && (
+        <div className="modal-wrap" role="dialog" aria-modal="true" aria-label={`${cmModalRow.name} team`}
+          onKeyDown={(e) => e.key === "Escape" && setCmModalId(null)}>
+          <div className="modal-backdrop" onClick={() => setCmModalId(null)} aria-hidden="true" />
+          <div className="modal">
+            <div className="modal-head">
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <strong className="modal-title">{cmModalRow.name}</strong>
+                  <span className={styles.cmBadge}>CM</span>
+                </div>
+                <span style={{ color: "var(--brand)", fontSize: 13, fontWeight: 600 }}>
+                  📍 {cmModalRow.locationDisplay || cmModalRow.location}
+                </span>
+                <span className="muted small" style={{ display: "block", marginTop: 2 }}>
+                  {cmModalChildren.length} supervisor{cmModalChildren.length !== 1 ? "s" : ""} · Overall CM Score: {cmModalRow.pct}%
+                </span>
+              </div>
+              <button className="modal-close" onClick={() => setCmModalId(null)} aria-label="Close">✕</button>
+            </div>
+            <div className="stack">
+              {cmModalChildren.map((child) => (
+                <ProgressCard
+                  key={child.id}
+                  r={child}
+                  onClick={() => {
+                    setCmModalId(null);
+                    setOpenId(child.id);
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

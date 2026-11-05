@@ -66,7 +66,17 @@ export default function EmployeeView() {
     ]);
   }, [reviewer, reviewChecks, activeLocation]);
 
-  const myIssues = issues.filter((i) => i.employeeId === currentEmployeeId);
+  // CM sees issues from themselves + their supervisors
+  const myTeamIds = useMemo(() => {
+    if (employee.designation === "cm") {
+      const ids = new Set([currentEmployeeId]);
+      users.forEach((u) => { if (u.supervisorId === currentEmployeeId) ids.add(u.id); });
+      return ids;
+    }
+    return new Set([currentEmployeeId]);
+  }, [employee.designation, currentEmployeeId, users]);
+
+  const myIssues = issues.filter((i) => myTeamIds.has(i.employeeId) || myTeamIds.has(i.userId));
   const myVisitors = visitors.filter((v) => v.employeeId === currentEmployeeId);
 
   const totalVisible = grouped.reduce((acc, [, tasks]) => acc + tasks.length, 0);

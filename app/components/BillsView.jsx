@@ -55,7 +55,7 @@ function billUrls(bill) {
 }
 
 export default function BillsView() {
-  const { user, bills, deleteBill } = useApp();
+  const { user, users, bills, deleteBill } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [viewUrls, setViewUrls] = useState([]);
   const [search, setSearch] = useState("");
@@ -75,6 +75,14 @@ export default function BillsView() {
     return { start: s, end: e };
   }, [preset, customStart, customEnd]);
 
+  // CM team member IDs (CM + their supervisors)
+  const cmTeamIds = useMemo(() => {
+    if (!isCM) return null;
+    const ids = new Set([user?.id]);
+    (users || []).forEach((u) => { if (u.supervisorId === user?.id) ids.add(u.id); });
+    return ids;
+  }, [isCM, user?.id, users]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return (bills || [])
@@ -82,7 +90,8 @@ export default function BillsView() {
         if (isManager) {
           if (locationFilter !== "All" && b.location !== locationFilter) return false;
         } else if (isCM) {
-          if (user?.location && b.location && b.location !== user.location) return false;
+          // CM sees only bills from their centre (themselves + their supervisors)
+          if (!cmTeamIds?.has(b.userId) && !cmTeamIds?.has(b.employeeId)) return false;
         } else if (b.userId !== user?.id && b.employeeId !== user?.id) {
           return false;
         }
@@ -101,7 +110,7 @@ export default function BillsView() {
         return true;
       })
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }, [bills, isManager, isCM, user, locationFilter, start, end, search]);
+  }, [bills, isManager, isCM, user, cmTeamIds, locationFilter, start, end, search]);
 
   function notify(msg) {
     setFlash(msg);
