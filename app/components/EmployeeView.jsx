@@ -17,8 +17,12 @@ import {
   liveDoneMap,
   reviewDoneMap,
   taskIsVisible,
+  taskIdsForUser,
   tasksForCategory,
   visibleTasks,
+  getCentreTeam,
+  computeCentreScore,
+  computeCMScore,
 } from "@/lib/seed";
 import IssueForm from "./IssueForm";
 import VisitorForm from "./VisitorForm";
@@ -26,7 +30,7 @@ import { IssuePhoto } from "./PhotoLightbox";
 import styles from "./EmployeeView.module.css";
 
 export default function EmployeeView() {
-  const { user, users, completions, reviewChecks, checklistPhotos, issues, visitors, toggleTask, addChecklistPhoto, removeChecklistPhoto, setIssueStatus, deleteIssue, deleteVisitor, view } = useApp();
+  const { user, users, completions, reviewChecks, checklistPhotos, issues, visitors, toggleTask, addChecklistPhoto, removeChecklistPhoto, updateIssueProgress, setIssueStatus, deleteIssue, deleteVisitor, view } = useApp();
   const tab = view === "issues" || view === "visitors" ? view : "tasks";
   const [reviewLocation, setReviewLocation] = useState(LOCATIONS[0]);
   const [query, setQuery] = useState("");
@@ -35,20 +39,43 @@ export default function EmployeeView() {
   const currentEmployeeId = user.id;
   const employee = users.find((u) => u.id === currentEmployeeId) || user;
   const reviewer = isDedicatedReviewer(employee);
+  const isCM = employee.designation === "cm";
   const homeLocation = employee.location && employee.location !== "All centres" ? employee.location : null;
-  const activeLocation = reviewer ? reviewLocation : homeLocation;
-  const siteDone = liveDoneMap(completions[currentEmployeeId] || {});
+
+  const mySupervisors = useMemo(() => isCM ? users.filter((u) => u.supervisorId === currentEmployeeId) : [], [isCM, users, currentEmployeeId]);
+  const managedLocations = useMemo(() => {
+    if (!isCM) return homeLocation ? [homeLocation] : [];
+    return [...new Set([employee.location, ...mySupervisors.map((s) => s.location)].filter((l) => l && l !== "All centres"))];
+  }, [isCM, employee.location, mySupervisors, homeLocation]);
+  const [selectedLoc, setSelectedLoc] = useState(null);
+  const activeLocation = reviewer
+    ? reviewLocation
+    : (managedLocations.includes(selectedLoc) ? selectedLoc : managedLocations[0] || homeLocation);
+
+  const centreTeam = useMemo(() => getCentreTeam(employee, users, activeLocation), [employee, users, activeLocation]);
+  const cmStats = useMemo(() => isCM ? computeCMScore(employee, users, completions) : null, [isCM, employee, users, completions]);
+  const siteDone = useMemo(() => {
+    const merged = {};
+    centreTeam.forEach((emp) => {
+      Object.assign(merged, liveDoneMap(completions[emp.id] || {}));
+    });
+    return merged;
+  }, [centreTeam, completions]);
 
   const myTasks = useMemo(() => {
-    const assigned = (employee.taskIds || []).map(taskById).filter(Boolean);
     if (reviewer) {
+      const assigned = (employee.taskIds || []).map(taskById).filter(Boolean);
       return assigned.filter((t) => {
         const done = reviewDoneMap(reviewChecks, t.category, activeLocation);
         return taskIsVisible(t, done[t.id]);
       });
     }
+    const allIds = new Set();
+    centreTeam.forEach((emp) => taskIdsForUser(emp).forEach((id) => allIds.add(id)));
+    if (allIds.size === 0) (employee.taskIds || []).forEach((id) => allIds.add(id));
+    const assigned = [...allIds].map(taskById).filter(Boolean);
     return visibleTasks(assigned, siteDone);
-  }, [employee.taskIds, reviewer, reviewChecks, activeLocation, siteDone]);
+  }, [employee, centreTeam, reviewer, reviewChecks, activeLocation, siteDone]);
   const grouped = useMemo(() => {
     const map = {};
     myTasks.forEach((t) => {
@@ -106,14 +133,32 @@ export default function EmployeeView() {
     <section>
       {tab === "tasks" && (
         <>
+      {isCM && managedLocations.length > 1 && (
+        <div className={styles.locSwitcher}>
+          {managedLocations.map((loc) => {
+            const sel = loc === activeLocation;
+            const locTeam = getCentreTeam(employee, users, loc);
+            const locScore = computeCentreScore(locTeam, completions);
+            return (
+              <button key={loc} type="button" className={`${styles.locTab} ${sel ? styles.locTabActive : ""}`} onClick={() => setSelectedLoc(loc)}>
+                <span className={styles.locName}>📍 {loc.split(",")[0]}</span>
+                <span className={styles.locScore}>{locScore.scorePct}% ({locScore.uniqueDoneCount}/{locScore.totalTasks})</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div className={styles.summaryCard}>
         <div className={styles.summaryText}>
           <h1 className={styles.summaryHeading}>
-            {reviewer ? reviewLocation : (employee.location || "Tasks")}
+            {reviewer ? reviewLocation : (activeLocation || employee.location || "Tasks")}
           </h1>
           <p className={styles.summaryMeta}>
             {totalDone} of {totalVisible} completed · {pct}% Done
           </p>
+          {isCM && managedLocations.length > 1 && cmStats && (
+            <span className={styles.cmBadge}>Overall CM Score: {cmStats.scorePct}% ({cmStats.uniqueDoneCount}/{cmStats.totalTasks} tasks)</span>
+          )}
         </div>
         <div className={styles.ring} style={{"--pct": pct}}>
           <span style={{color: pct === 100 ? "var(--ok)" : "var(--text)"}}>{pct}%</span>
@@ -185,6 +230,9 @@ export default function EmployeeView() {
                 done={done}
                 employeeId={currentEmployeeId}
                 toggleTask={(id, taskId) => toggleTask(id, taskId, activeLocation)}
+                centreTeam={centreTeam}
+                activeLocation={activeLocation}
+                allPhotos={checklistPhotos}
                 photos={(checklistPhotos[currentEmployeeId] || {})[category] || []}
                 onAddPhoto={addChecklistPhoto}
                 onRemovePhoto={removeChecklistPhoto}
@@ -224,12 +272,26 @@ export default function EmployeeView() {
                       {v.facilityType && <span className={`tag tag-common-areas`}>{v.facilityType}</span>}
                       <span className="muted small right">{v.date}</span>
                     </div>
-                    <p className="issue-desc"><strong>{v.guestName}</strong>{v.aggregator ? ` · ${v.aggregator}` : ""}</p>
+                    <p className="issue-desc"><strong>{v.guestName}</strong></p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+                      <span className="muted small">
+                        📍 {v.source === "Direct" ? "Direct" : `${v.source || "Aggregator"}${v.aggregator && v.aggregator !== "NA" ? ` (${v.aggregator})` : ""}`} · {v.payment || "Cash"}
+                      </span>
+                      {v.invoiceTechMonk != null && (
+                        <span style={{ background: v.invoiceTechMonk === "Yes" ? "color-mix(in srgb, var(--ok) 15%, transparent)" : "#fff3cd", color: v.invoiceTechMonk === "Yes" ? "var(--ok)" : "#9a6700", fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 5 }}>
+                          TM: {v.invoiceTechMonk}
+                        </span>
+                      )}
+                    </div>
+                    {(v.amountReceived != null || v.paymentAmount != null) && (
+                      <span style={{ color: "var(--ok)", fontWeight: 700, fontSize: 12, marginTop: 2 }}>
+                        💰 ₹{Number(v.amountReceived ?? v.paymentAmount ?? 0).toLocaleString("en-IN")}
+                      </span>
+                    )}
                     <div className="issue-foot">
                       <span className="muted small">
                         {v.arrivalTime && `In: ${v.arrivalTime}`}{v.punchOutTime && ` · Out: ${v.punchOutTime}`}{v.seats && ` · ${v.seats} seat${v.seats > 1 ? "s" : ""}`}
                       </span>
-                      {v.payment && <span className="chip chip-ok">₹{v.payment}</span>}
                       {canDeleteVisitor(v) && (
                         <button
                           type="button"
@@ -260,55 +322,7 @@ export default function EmployeeView() {
             ) : (
               <ul className="issue-list">
                 {myIssues.map((i) => (
-                  <li key={i.id} className={`issue-item issue-${slug(i.status)}`}>
-                    <div className="issue-top">
-                      <span className="muted small">{i.location}</span>
-                      <span className={`tag tag-${slug(i.category)}`}>
-                        {i.category}
-                      </span>
-                      <span className="muted small right">
-                        {new Date(i.createdAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </div>
-                    <p className="issue-desc">{i.notes || i.description}</p>
-                    {i.photo && (
-                      <IssuePhoto
-                        src={i.photo}
-                        caption={`${i.category} · ${i.location}`}
-                      />
-                    )}
-                    <div className="issue-foot">
-                      <label className="issue-status-set">
-                        <span className="muted small">Status</span>
-                        <select
-                          value={i.status}
-                          onChange={(e) => setIssueStatus(i.id, e.target.value)}
-                        >
-                          {ISSUE_STATUSES.map((s) => (
-                            <option key={s} value={s}>
-                              {s}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      {canDeleteIssue(i) && (
-                        <button
-                          type="button"
-                          className="btn-delete"
-                          onClick={() => {
-                            if (!window.confirm("Delete this issue?")) return;
-                            const result = deleteIssue(i.id);
-                            if (!result.ok) window.alert(result.error);
-                          }}
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </div>
-                  </li>
+                  <IssueItem key={i.id} issue={i} isCM={isCM} isManager={false} onUpdateProgress={updateIssueProgress} onStatusChange={setIssueStatus} onDelete={canDeleteIssue(i) ? deleteIssue : null} />
                 ))}
               </ul>
             )}
@@ -325,6 +339,9 @@ function CategoryAccordion({
   done,
   employeeId,
   toggleTask,
+  centreTeam,
+  activeLocation,
+  allPhotos,
   photos = [],
   onAddPhoto,
   onRemovePhoto,
@@ -335,7 +352,20 @@ function CategoryAccordion({
   const [open, setOpen] = useState(false);
   const pct = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0;
   const gate = !readOnly && CHECKLIST_PHOTO_GATES[category];
-  const locked = readOnly || (gate && !checklistPhotosReady(category, photos));
+  const teamPhotoReady = useMemo(() => {
+    if (!gate || readOnly) return true;
+    if (centreTeam && allPhotos) {
+      for (const emp of centreTeam) {
+        const locKey = activeLocation ? `${emp.id}@${activeLocation}` : null;
+        const locPhotos = locKey ? allPhotos[locKey]?.[category] : null;
+        const plainPhotos = allPhotos[emp.id]?.[category];
+        if (checklistPhotosReady(category, locPhotos || plainPhotos)) return true;
+      }
+      return false;
+    }
+    return checklistPhotosReady(category, photos);
+  }, [gate, readOnly, centreTeam, allPhotos, activeLocation, category, photos]);
+  const locked = readOnly || (gate && !teamPhotoReady);
 
   return (
     <div className={`${styles.card} ${styles.accordionCard}`}>
@@ -496,4 +526,130 @@ function readImageAsDataUrl(file, maxW = 1600, quality = 0.72) {
 
 function slug(s) {
   return s.toLowerCase().replace(/\s+/g, "-");
+}
+
+function formatTimeAgo(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  const diff = Date.now() - d.getTime();
+  if (diff < 60000) return "just now";
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+
+function IssueItem({ issue, isCM, isManager, onUpdateProgress, onStatusChange, onDelete }) {
+  const [showModal, setShowModal] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState(issue.status);
+  const [progressNote, setProgressNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const i = issue;
+  const canEdit = isManager || isCM;
+  const history = i.progressHistory || [];
+  const isOverdue = i.status !== "Resolved" && (i.escalationSent || Date.now() - new Date(i.createdAt).getTime() >= 259200000);
+
+  async function handleSaveProgress() {
+    setSubmitting(true);
+    await onUpdateProgress(i.id, { status: selectedStatus, progressNote: progressNote.trim() || undefined });
+    setProgressNote("");
+    setSubmitting(false);
+    setShowModal(false);
+  }
+
+  return (
+    <>
+      <li className={`issue-item issue-${slug(i.status)}`} style={isOverdue ? { borderLeft: "3.5px solid var(--warn, #f59e0b)" } : undefined}>
+        <div className="issue-top">
+          <span className="muted small">{i.location}</span>
+          <span className={`tag tag-${slug(i.category)}`}>{i.category}</span>
+          <span className="muted small right">{new Date(i.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+        </div>
+        {isOverdue && <div className={styles.escalationBadge}>🚨 Escalated (3+ Days Unresolved)</div>}
+        <p className="issue-desc">{i.notes || i.description}</p>
+        {i.photo && <IssuePhoto src={i.photo} caption={`${i.category} · ${i.location}`} />}
+        {i.progressNote && (
+          <div className={styles.progressLast}>
+            <span className="muted small">Last update: <strong>{i.progressUpdatedBy}</strong> ({i.progressUpdatedByRole})</span>
+            <p className={styles.progressText}>[{i.status}] {i.progressNote}</p>
+          </div>
+        )}
+        {history.length > 0 && (
+          <details className={styles.historyBlock}>
+            <summary className="muted small">Progress History ({history.length})</summary>
+            <ul className={styles.historyList}>
+              {history.map((h) => (
+                <li key={h.id} className={styles.historyItem}>
+                  <div className={styles.historyMeta}>
+                    <span className="muted small">{h.updatedByName} {h.updatedByRole ? `(${h.updatedByRole})` : ""}</span>
+                    <span className="muted small">{formatTimeAgo(h.updatedAt)}</span>
+                  </div>
+                  <p className={styles.historyNote}><strong style={{ color: "var(--brand)" }}>[{h.status}]</strong> {h.note}</p>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
+        <div className="issue-foot">
+          <label className="issue-status-set">
+            <span className="muted small">Status</span>
+            <select value={i.status} onChange={(e) => onStatusChange(i.id, e.target.value)}>
+              {ISSUE_STATUSES.map((s) => (<option key={s} value={s}>{s}</option>))}
+            </select>
+          </label>
+          {canEdit && (
+            <button type="button" className={styles.progressBtn} onClick={() => { setSelectedStatus(i.status); setProgressNote(""); setShowModal(true); }}>
+              ✏️ {i.progressNote ? "Update Progress" : "Add Note"}
+            </button>
+          )}
+          {onDelete && (
+            <button type="button" className="btn-delete" onClick={() => { if (window.confirm("Delete this issue?")) onDelete(i.id); }}>Delete</button>
+          )}
+        </div>
+      </li>
+      {showModal && (
+        <div className="modal-wrap" role="dialog" aria-modal="true" aria-label="Update issue progress">
+          <div className="modal-backdrop" onClick={() => setShowModal(false)} aria-hidden="true" />
+          <div className="modal">
+            <div className="modal-head">
+              <div>
+                <strong className="modal-title">Issue Progress Update</strong>
+                <span className="muted small">{i.category} at {i.location}</span>
+              </div>
+              <button type="button" className="modal-close" onClick={() => setShowModal(false)} aria-label="Close">✕</button>
+            </div>
+            <div className="field">
+              <span>Status</span>
+              <div className={styles.progressPills}>
+                {ISSUE_STATUSES.map((s) => (
+                  <button key={s} type="button" className={`chip-filter ${selectedStatus === s ? "active" : ""}`} onClick={() => setSelectedStatus(s)}>{s}</button>
+                ))}
+              </div>
+            </div>
+            <label className="field">
+              <span>Progress Note</span>
+              <textarea rows={3} value={progressNote} onChange={(e) => setProgressNote(e.target.value)} placeholder="Describe what was done, next steps…" />
+            </label>
+            {history.length > 0 && (
+              <div className={styles.modalHistory}>
+                <span className="muted small" style={{ fontWeight: 700 }}>Previous Updates</span>
+                {history.slice(-5).reverse().map((h) => (
+                  <div key={h.id} className={styles.historyItem}>
+                    <div className={styles.historyMeta}>
+                      <span className="muted small">{h.updatedByName} ({h.updatedByRole})</span>
+                      <span className="muted small">{formatTimeAgo(h.updatedAt)}</span>
+                    </div>
+                    <p className={styles.historyNote}><strong style={{ color: "var(--brand)" }}>[{h.status}]</strong> {h.note}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="modal-actions">
+              <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+              <button type="button" className="btn-primary" disabled={submitting} onClick={handleSaveProgress}>{submitting ? "Saving…" : "Save Progress"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }

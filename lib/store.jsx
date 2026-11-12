@@ -23,6 +23,7 @@ import {
 
 const SESSION_KEY = "onward-session-v2";
 const TOKEN_KEY = "token";
+const ALERTS_READ_KEY = "onward-alerts-read-v1";
 
 const AppContext = createContext(null);
 
@@ -51,6 +52,9 @@ export function AppProvider({ children }) {
   const [issues, setIssues] = useState([]);
   const [visitors, setVisitors] = useState([]);
   const [alerts, setAlerts] = useState([]);
+  const [alertsRead, setAlertsRead] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(ALERTS_READ_KEY)) || {}; } catch { return {}; }
+  });
   const [bills, setBills] = useState([]);
   const [hydrated, setHydrated] = useState(false);
   const [view, setView] = useState("tasks");
@@ -125,16 +129,12 @@ export function AppProvider({ children }) {
 
       ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data);
-          if (data.event === "bill_created" && data.data?.id) {
-            setBills((prev) => (prev.some((b) => b.id === data.data.id) ? prev : [data.data, ...prev]));
-          } else if (data.event === "bill_updated" && data.data?.id) {
-            setBills((prev) => prev.map((b) => (b.id === data.data.id ? { ...b, ...data.data } : b)));
-          } else if (data.event === "bill_deleted" && data.data?.id) {
-            setBills((prev) => prev.filter((b) => b.id !== data.data.id));
-          }
-          if (data.type === "completion") {
-            const { userId, taskId, status, completed_at } = data.payload || {};
+          const msg = JSON.parse(event.data);
+          const ev = msg.event || msg.type;
+          const d = msg.data || msg.payload || {};
+
+          if (ev === "completion") {
+            const { userId, taskId, status, completed_at } = d;
             if (userId && taskId) {
               setCompletions((prev) => {
                 const userComp = { ...(prev[userId] || {}) };
@@ -146,6 +146,40 @@ export function AppProvider({ children }) {
                 return { ...prev, [userId]: userComp };
               });
             }
+          } else if (ev === "photo_upload") {
+            const { userId: empId, category, location: loc, photo_url } = d;
+            if (empId && category && photo_url) {
+              const photoKey = loc ? `${empId}@${loc}` : empId;
+              setChecklistPhotos((prev) => {
+                const emp = { ...(prev[photoKey] || {}) };
+                const current = emp[category] || [];
+                if (!current.includes(photo_url)) emp[category] = [...current, photo_url];
+                return { ...prev, [photoKey]: emp };
+              });
+            }
+          } else if (ev === "photo_delete") {
+            const { userId: empId, category, photo_url } = d;
+            if (empId && category && photo_url) {
+              setChecklistPhotos((prev) => {
+                const emp = { ...(prev[empId] || {}) };
+                emp[category] = (emp[category] || []).filter((u) => u !== photo_url);
+                return { ...prev, [empId]: emp };
+              });
+            }
+          } else if (ev === "bill_created" && d.id) {
+            setBills((prev) => (prev.some((b) => b.id === d.id) ? prev : [d, ...prev]));
+          } else if (ev === "bill_updated" && d.id) {
+            setBills((prev) => prev.map((b) => (b.id === d.id ? { ...b, ...d } : b)));
+          } else if (ev === "bill_deleted" && d.id) {
+            setBills((prev) => prev.filter((b) => b.id !== d.id));
+          } else if (ev === "issue_created" && d.id) {
+            setIssues((prev) => (prev.some((i) => i.id === d.id) ? prev : [d, ...prev]));
+          } else if (ev === "issue_updated" && d.id) {
+            setIssues((prev) => prev.map((i) => (i.id === d.id ? { ...i, ...d } : i)));
+          } else if (ev === "issue_deleted" && d.id) {
+            setIssues((prev) => prev.filter((i) => i.id !== d.id));
+          } else if (ev === "alert_created" && d.id) {
+            setAlerts((prev) => (prev.some((a) => a.id === d.id) ? prev : [d, ...prev]));
           }
         } catch {
           // ignore non-json messages
@@ -191,6 +225,11 @@ export function AppProvider({ children }) {
       }
     };
   }, [fetchInitialData, connectWebSocket]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try { localStorage.setItem(ALERTS_READ_KEY, JSON.stringify(alertsRead)); } catch {}
+  }, [alertsRead, hydrated]);
 
   async function login(username, password) {
     try {
@@ -244,11 +283,16 @@ export function AppProvider({ children }) {
   }, []);
 
   const markAlertRead = useCallback((id) => {
-    setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, read: true, is_read: true } : a)));
+    setAlertsRead((prev) => ({ ...prev, [id]: true }));
   }, []);
 
   const markAllAlertsRead = useCallback(() => {
-    setAlerts((prev) => prev.map((a) => ({ ...a, read: true, is_read: true })));
+    setAlerts((prev) => {
+      const readMap = {};
+      prev.forEach((a) => { readMap[a.id] = true; });
+      setAlertsRead((old) => ({ ...old, ...readMap }));
+      return prev;
+    });
   }, []);
 
   async function toggleTask(employeeId, taskId, location) {
@@ -376,16 +420,44 @@ export function AppProvider({ children }) {
     }
   }
 
-  async function setIssueStatus(issueId, status) {
+  async function updateIssueProgress(issueId, { status, progressNote }) {
+    const now = new Date().toISOString();
+    const roleName = user?.designation === "cluster-manager" ? "Cluster Manager"
+      : user?.designation === "cm" ? "Centre Manager"
+        : user?.role === "manager" ? "Manager" : "Staff";
+
+    setIssues((prev) =>
+      prev.map((i) => {
+        if (i.id !== issueId) return i;
+        const newStatus = status || i.status;
+        const newHistory = [...(i.progressHistory || [])];
+        if (progressNote) {
+          newHistory.push({ id: `local-${Date.now()}`, status: newStatus, note: progressNote.trim(), updatedByName: user?.name || "You", updatedByRole: roleName, updatedAt: now });
+        }
+        return {
+          ...i,
+          status: newStatus,
+          progressNote: progressNote ? progressNote.trim() : i.progressNote,
+          progressUpdatedBy: progressNote ? (user?.name || "You") : i.progressUpdatedBy,
+          progressUpdatedByRole: progressNote ? roleName : i.progressUpdatedByRole,
+          progressUpdatedAt: progressNote ? now : i.progressUpdatedAt,
+          progressHistory: newHistory,
+          updatedAt: now,
+        };
+      })
+    );
+
     try {
-      await api.patch(`/issues/${issueId}/status`, { status });
-      setIssues((prev) =>
-        prev.map((i) => (i.id === issueId ? { ...i, status, updatedAt: new Date().toISOString() } : i))
-      );
+      const res = await api.patch(`/issues/${issueId}/progress`, { status, progressNote });
+      if (res?.issue) setIssues((prev) => prev.map((i) => (i.id === issueId ? { ...i, ...res.issue } : i)));
       return { ok: true };
     } catch (err) {
-      return { ok: false, error: err.message || "Could not update issue status." };
+      return { ok: false, error: err.message || "Could not update issue progress." };
     }
+  }
+
+  async function setIssueStatus(issueId, status) {
+    return updateIssueProgress(issueId, { status });
   }
 
   async function deleteIssue(issueId) {
@@ -439,6 +511,20 @@ export function AppProvider({ children }) {
       return { ok: false, error: "Failed to submit bill." };
     } catch (err) {
       return { ok: false, error: err.message || "Failed to submit bill." };
+    }
+  }
+
+  async function updateBillStatus(billId, status, statusRemark) {
+    try {
+      const res = await api.patch(`/bills/${billId}/status`, { status, status_remark: statusRemark });
+      const updated = res?.bill || res;
+      if (updated?.id) {
+        setBills((prev) => prev.map((b) => (b.id === billId ? { ...b, ...updated, status } : b)));
+        return { ok: true, bill: updated };
+      }
+      return { ok: false, error: "Failed to update bill status." };
+    } catch (err) {
+      return { ok: false, error: err.message || "Failed to update status." };
     }
   }
 
@@ -525,10 +611,12 @@ export function AppProvider({ children }) {
     bills,
     addBill,
     deleteBill,
+    updateBillStatus,
     toggleTask,
     addChecklistPhoto,
     removeChecklistPhoto,
     addIssue,
+    updateIssueProgress,
     setIssueStatus,
     deleteIssue,
     addVisitor,
@@ -539,7 +627,7 @@ export function AppProvider({ children }) {
     clearUserCompletions,
     clearMyPhotos,
     clearUserPhotos,
-    alerts,
+    alerts: alerts.map((a) => ({ ...a, read: a.read || !!alertsRead[a.id] })),
     addAlert,
     markAlertRead,
     markAllAlertsRead,

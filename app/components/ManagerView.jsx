@@ -6,6 +6,7 @@ import {
   CATEGORIES,
   ISSUE_STATUSES,
   LOCATIONS,
+  REVIEW_CATEGORIES,
   TASKS,
   canDeleteIssue,
   canDeleteVisitor,
@@ -13,6 +14,7 @@ import {
   computeCentreScore,
   getCentreTeam,
   liveDoneMap,
+  reviewProgress,
   taskIdsForUser,
   visibleTasks,
 } from "@/lib/seed";
@@ -21,7 +23,7 @@ import CmView from "./CmView";
 import styles from "./ManagerView.module.css";
 
 export default function ManagerView() {
-  const { user, completions, checklistPhotos, issues, visitors, employees, view: tab, setIssueStatus } = useApp();
+  const { user, completions, checklistPhotos, reviewChecks, issues, visitors, employees, view: tab, updateIssueProgress, setIssueStatus } = useApp();
   const [unit, setUnit] = useState("all");
   const [openId, setOpenId] = useState(null);
 
@@ -93,7 +95,7 @@ export default function ManagerView() {
       ) : tab === "issues" ? (
         <IssuesTab issues={issues} setIssueStatus={setIssueStatus} />
       ) : tab === "scores" ? (
-        <ScoresTab rows={rows} />
+        <ScoresTab rows={rows} setOpenId={setOpenId} />
       ) : (
         <HomeTab
           totals={totals}
@@ -106,6 +108,8 @@ export default function ManagerView() {
           hasCMs={hasCMs}
           employees={employees}
           completions={completions}
+          issues={issues}
+          reviewChecks={reviewChecks}
         />
       )}
       {openRow && <PersonModal row={openRow} onClose={() => setOpenId(null)} />}
@@ -144,7 +148,7 @@ function ProgressCard({ r, onClick, children }) {
   );
 }
 
-function HomeTab({ totals, rows, detailRows, unit, setUnit, setOpenId, locs, hasCMs, employees, completions }) {
+function HomeTab({ totals, rows, detailRows, unit, setUnit, setOpenId, locs, hasCMs, employees, completions, issues, reviewChecks }) {
   const [cmModalId, setCmModalId] = useState(null);
 
   // Build CM-to-children mapping
@@ -185,6 +189,7 @@ function HomeTab({ totals, rows, detailRows, unit, setUnit, setOpenId, locs, has
         <StatTile label="COMPLETION" value={`${totals.pct}%`} />
         <StatTile label="DONE" value={`${totals.completed}/${totals.total}`} />
         <StatTile label="ON TRACK" value={`${totals.onTrack}/${rows.length}`} ok />
+        <StatTile label="OPEN ISSUES" value={issues.filter((i) => i.status !== "Resolved").length} />
       </div>
 
       {!hasCMs && <div className={styles.chipScroll}>
@@ -276,12 +281,38 @@ function HomeTab({ totals, rows, detailRows, unit, setUnit, setOpenId, locs, has
           </div>
         </div>
       )}
+
+      {REVIEW_CATEGORIES.map((cat) => {
+        const reviewLocs = hasCMs ? locs : LOCATIONS;
+        return (
+          <div key={cat}>
+            <h2 className={styles.sectionHead}>{cat} Review</h2>
+            <div className="stack">
+              {reviewLocs.map((loc) => {
+                const prog = reviewProgress(reviewChecks, cat, loc);
+                const rpct = prog.total > 0 ? Math.round((prog.completed / prog.total) * 100) : 0;
+                return (
+                  <div key={loc} className={styles.reviewRow}>
+                    <div className={styles.reviewRowTop}>
+                      <span className={styles.reviewLoc}>{loc}</span>
+                      <span className="muted small">{prog.completed}/{prog.total}</span>
+                    </div>
+                    <div className="progress-track" style={{ marginTop: 6 }}>
+                      <span className="progress-fill" style={{ width: `${rpct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </>
   );
 }
 
 function IssuesTab({ issues: allIssues, setIssueStatus }) {
-  const { deleteIssue } = useApp();
+  const { deleteIssue, updateIssueProgress } = useApp();
   const [unit, setUnit] = useState("all");
   const [status, setStatus] = useState("all");
   const [search, setSearch] = useState("");
@@ -326,7 +357,7 @@ function IssuesTab({ issues: allIssues, setIssueStatus }) {
       ) : (
         <div className="stack">
           {filtered.map((i) => (
-            <IssueCard key={i.id} issue={i} onStatusChange={setIssueStatus} onDelete={deleteIssue} />
+            <IssueCard key={i.id} issue={i} onStatusChange={setIssueStatus} onUpdateProgress={updateIssueProgress} onDelete={deleteIssue} />
           ))}
         </div>
       )}
@@ -334,39 +365,112 @@ function IssuesTab({ issues: allIssues, setIssueStatus }) {
   );
 }
 
-function IssueCard({ issue: i, onStatusChange, onDelete }) {
+function IssueCard({ issue: i, onStatusChange, onUpdateProgress, onDelete }) {
+  const [showModal, setShowModal] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState(i.status);
+  const [progressNote, setProgressNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const timeStr = new Date(i.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
-  const borderLeft = i.status === "In progress" ? "3px solid #2f6df4" : i.status === "Resolved" ? "3px solid var(--ok)" : undefined;
+  const isOverdue = i.status !== "Resolved" && (i.escalationSent || Date.now() - new Date(i.createdAt).getTime() >= 259200000);
+  const borderLeft = isOverdue ? "3.5px solid var(--warn, #f59e0b)" : i.status === "In progress" ? "3px solid #2f6df4" : i.status === "Resolved" ? "3px solid var(--ok)" : undefined;
+  const history = i.progressHistory || [];
+
+  async function handleSaveProgress() {
+    setSubmitting(true);
+    await onUpdateProgress(i.id, { status: selectedStatus, progressNote: progressNote.trim() || undefined });
+    setProgressNote("");
+    setSubmitting(false);
+    setShowModal(false);
+  }
 
   return (
-    <div className={styles.issueCard} style={borderLeft ? { borderLeft } : undefined}>
-      <div className={styles.issueTop}>
-        <span className={`tag tag-${slug(i.category)}`}>{i.category}</span>
-        <span className={`status-badge status-${slug(i.status)}`}>{i.status}</span>
-      </div>
-      <p className={styles.issueDesc}>{i.notes || i.description}</p>
-      {i.photo && <IssuePhoto src={i.photo} caption={`${i.category} · ${i.location}`} />}
-      <div className={styles.issueFoot}>
-        <span className="muted small">{i.employeeName} · {i.location} · {timeStr}</span>
-        <div className={styles.statusBtns}>
-          {[["Unattended", "New"], ["In progress", "WIP"], ["Resolved", "Done"]].map(([val, label]) => (
-            <button
-              key={val}
-              type="button"
-              className={`${styles.statusBtn} ${i.status === val ? styles.statusBtnActive : ""}`}
-              onClick={() => onStatusChange(i.id, val)}
-            >{label}</button>
-          ))}
+    <>
+      <div className={styles.issueCard} style={borderLeft ? { borderLeft } : undefined}>
+        <div className={styles.issueTop}>
+          <span className={`tag tag-${slug(i.category)}`}>{i.category}</span>
+          <span className={`status-badge status-${slug(i.status)}`}>{i.status}</span>
+        </div>
+        {isOverdue && <div style={{ background: "color-mix(in srgb, var(--warn, #f59e0b) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--warn, #f59e0b) 40%, transparent)", color: "var(--warn, #f59e0b)", fontSize: 11, fontWeight: 600, padding: "4px 8px", borderRadius: 6 }}>🚨 Escalated (3+ Days Unresolved)</div>}
+        <p className={styles.issueDesc}>{i.notes || i.description}</p>
+        {i.photo && <IssuePhoto src={i.photo} caption={`${i.category} · ${i.location}`} />}
+        {i.progressNote && (
+          <div style={{ background: "var(--surface-2, var(--surface))", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 10px", fontSize: 13 }}>
+            <span className="muted small">Last: <strong>{i.progressUpdatedBy}</strong> ({i.progressUpdatedByRole})</span>
+            <p style={{ margin: "4px 0 0", color: "var(--text)" }}>[{i.status}] {i.progressNote}</p>
+          </div>
+        )}
+        {history.length > 0 && (
+          <details style={{ fontSize: 12 }}>
+            <summary className="muted small" style={{ cursor: "pointer", fontWeight: 600 }}>Progress History ({history.length})</summary>
+            {history.slice(-5).reverse().map((h) => (
+              <div key={h.id} style={{ padding: "4px 0", borderBottom: "1px solid var(--border)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                  <span className="muted small">{h.updatedByName} ({h.updatedByRole})</span>
+                  <span className="muted small">{fmtAgo(h.updatedAt)}</span>
+                </div>
+                <p style={{ margin: "2px 0 0", color: "var(--text)" }}><strong style={{ color: "var(--brand)" }}>[{h.status}]</strong> {h.note}</p>
+              </div>
+            ))}
+          </details>
+        )}
+        <div className={styles.issueFoot}>
+          <span className="muted small">{i.employeeName} · {i.location} · {timeStr}{i.clusterManagerName ? ` · CM: ${i.clusterManagerName}` : ""}</span>
+          <div className={styles.statusBtns}>
+            {[["Unattended", "New"], ["In progress", "WIP"], ["Resolved", "Done"]].map(([val, label]) => (
+              <button key={val} type="button" className={`${styles.statusBtn} ${i.status === val ? styles.statusBtnActive : ""}`} onClick={() => onStatusChange(i.id, val)}>{label}</button>
+            ))}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <button type="button" style={{ background: "color-mix(in srgb, var(--brand) 12%, transparent)", border: "1px solid color-mix(in srgb, var(--brand) 30%, transparent)", color: "var(--brand)", fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 8, cursor: "pointer" }} onClick={() => { setSelectedStatus(i.status); setProgressNote(""); setShowModal(true); }}>
+            ✏️ {i.progressNote ? "Update Progress" : "Add Note"}
+          </button>
+          {canDeleteIssue(i) && (
+            <button type="button" className="btn-delete" onClick={() => { if (window.confirm("Delete this issue?")) { const r = onDelete(i.id); if (!r.ok) window.alert(r.error); } }}>Delete</button>
+          )}
         </div>
       </div>
-      {canDeleteIssue(i) && (
-        <button type="button" className="btn-delete" style={{ marginTop: 8 }}
-          onClick={() => { if (!window.confirm("Delete this issue?")) return; const r = onDelete(i.id); if (!r.ok) window.alert(r.error); }}>
-          Delete
-        </button>
+      {showModal && (
+        <div className="modal-wrap" role="dialog" aria-modal="true">
+          <div className="modal-backdrop" onClick={() => setShowModal(false)} aria-hidden="true" />
+          <div className="modal">
+            <div className="modal-head">
+              <div>
+                <strong className="modal-title">Issue Progress Update</strong>
+                <span className="muted small">{i.category} at {i.location}</span>
+              </div>
+              <button type="button" className="modal-close" onClick={() => setShowModal(false)} aria-label="Close">✕</button>
+            </div>
+            <div className="field">
+              <span>Status</span>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {ISSUE_STATUSES.map((s) => (
+                  <button key={s} type="button" className={`chip-filter ${selectedStatus === s ? "active" : ""}`} onClick={() => setSelectedStatus(s)}>{s}</button>
+                ))}
+              </div>
+            </div>
+            <label className="field">
+              <span>Progress Note</span>
+              <textarea rows={3} value={progressNote} onChange={(e) => setProgressNote(e.target.value)} placeholder="Describe what was done, next steps…" />
+            </label>
+            <div className="modal-actions">
+              <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+              <button type="button" className="btn-primary" disabled={submitting} onClick={handleSaveProgress}>{submitting ? "Saving…" : "Save Progress"}</button>
+            </div>
+          </div>
+        </div>
       )}
-    </div>
+    </>
   );
+}
+
+function fmtAgo(dateStr) {
+  if (!dateStr) return "";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  if (diff < 60000) return "just now";
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  return new Date(dateStr).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
 
 function VASTab({ visitors: allVisitors }) {
@@ -414,7 +518,7 @@ function VASTab({ visitors: allVisitors }) {
               </div>
               <div className={styles.visitorMeta} style={{ marginTop: 6 }}>
                 <span className="muted small">
-                  📍 {v.source === "Direct" ? "Direct" : (v.aggregatorName || v.aggregator || "Aggregator")} · {v.payment || "Cash"}
+                  📍 {v.source === "Direct" ? "Direct" : `${v.source || "Aggregator"}${v.aggregator && v.aggregator !== "NA" ? ` (${v.aggregator})` : ""}`} · {v.payment || "Cash"}
                 </span>
               </div>
               {(v.amountReceived != null || v.paymentAmount != null) && (
@@ -439,7 +543,7 @@ function VASTab({ visitors: allVisitors }) {
   );
 }
 
-function ScoresTab({ rows }) {
+function ScoresTab({ rows, setOpenId }) {
   const { employees, completions } = useApp();
   const [search, setSearch] = useState("");
   const [expandedCM, setExpandedCM] = useState(null);
@@ -519,6 +623,13 @@ function ScoresTab({ rows }) {
                       </div>
                     </div>
                   ))}
+                  <button
+                    type="button"
+                    style={{ marginTop: 8, background: "var(--brand)", color: "#fff", border: "none", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                    onClick={(e) => { e.stopPropagation(); setOpenId(r.id); }}
+                  >
+                    View Tasks
+                  </button>
                 </div>
               )}
             </div>

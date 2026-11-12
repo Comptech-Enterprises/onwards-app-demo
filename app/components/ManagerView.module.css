@@ -3,12 +3,18 @@
   padding: 16px;
 }
 
-/* 3-tile stat row */
+/* 4-tile stat row */
 .statRow {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
   margin-bottom: 16px;
+}
+
+@media (max-width: 480px) {
+  .statRow {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .tile {
@@ -324,5 +330,28 @@
 .subChip strong {
   color: var(--brand);
   font-weight: 700;
+}
+
+/* Review progress rows */
+.reviewRow {
+  composes: panel from "./glass.module.css";
+  padding: 12px 14px;
+}
+
+.reviewRowTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.reviewLoc {
+  color: var(--text);
+  font-weight: 500;
+  font-size: 14px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
